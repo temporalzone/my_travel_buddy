@@ -1,0 +1,123 @@
+from flask import Blueprint, request, jsonify
+import bcrypt
+import uuid
+from database import get_db
+from helpers import create_token, now
+
+auth_bp = Blueprint("auth", __name__)
+
+@auth_bp.route("/register", methods=["POST"])
+def register():
+    data = request.get_json()
+
+    if not data.get("name") or not data.get("email") or not data.get("password"):
+        return jsonify({"error": "Name, email and password are required"}), 400
+
+    if "@" not in data["email"]:
+        return jsonify({"error": "Enter a valid email address"}), 400
+
+    if len(data["password"]) < 6:
+        return jsonify({"error": "Password must be at least 6 characters"}), 400
+
+    conn = get_db()
+
+    existing = conn.execute(
+        "SELECT id FROM users WHERE email = ?",
+        (data["email"].lower().strip(),)
+    ).fetchone()
+
+    if existing:
+        conn.close()
+        return jsonify({"error": "Email already registered"}), 409
+
+    hashed = bcrypt.hashpw(
+        data["password"].encode("utf-8"),
+        bcrypt.gensalt()
+    ).decode("utf-8")
+
+    user_id = str(uuid.uuid4())
+    joined  = now()
+
+    conn.execute("""
+        INSERT INTO users (id, name, email, password, location, bio, interests, joined_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        user_id,
+        data["name"].strip(),
+        data["email"].lower().strip(),
+        hashed,
+        data.get("location", "Earth 🌍"),
+        data.get("bio", "New traveler!"),
+        "",
+        joined
+    ))
+    conn.commit()
+    conn.close()
+
+    return jsonify({
+        "token": create_token(user_id),
+        "user": {
+            "id":        user_id,
+            "name":      data["name"].strip(),
+            "email":     data["email"].lower().strip(),
+            "location":  data.get("location", "Earth 🌍"),
+            "bio":       data.get("bio", "New traveler!"),
+            "interests": [],
+            "joined_at": joined
+        }
+    }), 201
+
+
+@auth_bp.route("/login", methods=["POST"])
+def login():
+    data = request.get_json()
+
+    if not data.get("email") or not data.get("password"):
+        return jsonify({"error": "Email and password are required"}), 400
+
+    conn = get_db()
+    user = conn.execute(
+        "SELECT * FROM users WHERE email = ?",
+        (data["email"].lower().strip(),)
+    ).fetchone()
+    conn.close()
+
+    if not user:
+        return jsonify({"error": "Incorrect email or password"}), 401
+
+    pw_ok = bcrypt.checkpw(
+        data["password"].encode("utf-8"),
+        user["password"].encode("utf-8")
+    )
+
+    if not pw_ok:
+        return jsonify({"error": "Incorrect email or password"}), 401
+
+    return jsonify({
+        "token": create_token(user["id"]),
+        "user": {
+            "id":        user["id"],
+            "name":      user["name"],
+            "email":     user["email"],
+            "location":  user["location"],
+            "bio":       user["bio"],
+            "interests": user["interests"].split(",") if user["interests"] else [],
+            "joined_at": user["joined_at"]
+        }
+    }), 200
+
+
+@auth_bp.route("/forgot-password", methods=["POST"])
+def forgot_password():
+    data = request.get_json()
+    conn = get_db()
+    user = conn.execute(
+        "SELECT id FROM users WHERE email = ?",
+        (data.get("email", "").lower(),)
+    ).fetchone()
+    conn.close()
+
+    if not user:
+        return jsonify({"error": "No account found with that email"}), 404
+
+    return jsonify({"message": "Reset link sent to your email!"}), 200
