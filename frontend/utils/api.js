@@ -2,7 +2,7 @@
 //  utils/api.js — All API calls to the Flask backend
 // ============================================================
 
-const BASE_URL = "http://localhost:5000/api";
+const BASE_URL = "https://my-travel-buddy-kn22.onrender.com/api";
 
 // Get saved token from localStorage
 const getToken = () => localStorage.getItem("tb_token");
