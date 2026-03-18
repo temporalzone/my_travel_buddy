@@ -1,32 +1,975 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Travel Buddy</title>
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=Nunito:wght@400;600;700&display=swap" rel="stylesheet"/>
-  <link rel="stylesheet" href="styles/global.css"/>
-  <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Travel Buddy</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Nunito:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+:root{
+  --ink:#0F172A;--deep:#1E293B;--mid:#334155;
+  --teal:#0EA5E9;--teal2:#0284C7;
+  --emerald:#10B981;--violet:#8B5CF6;
+  --amber:#F59E0B;--rose:#F43F5E;
+  --surface:#F8FAFC;--card:#FFFFFF;
+  --border:#E2E8F0;--muted:#94A3B8;--text:#1E293B;
+}
+html,body{height:100%;font-family:'Nunito',sans-serif;background:var(--surface);color:var(--text);overflow-x:hidden;}
+#root{height:100%;}
+::-webkit-scrollbar{width:4px;}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:10px;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+@keyframes float{0%,100%{transform:translateY(0);}50%{transform:translateY(-8px);}}
+@keyframes shimmer{0%{background-position:-200% 0;}100%{background-position:200% 0;}}
+.fade-up{animation:fadeUp .45s ease both;}
+.float{animation:float 3s ease-in-out infinite;}
+
+/* LOGO */
+.logo-wrap{display:flex;align-items:center;gap:9px;cursor:pointer;user-select:none;}
+.logo-text{font-family:'Syne',sans-serif;font-weight:800;font-size:1.3rem;color:var(--ink);}
+.logo-text em{color:var(--teal);font-style:normal;}
+
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:.65rem 1.5rem;border-radius:10px;font-family:'Nunito',sans-serif;font-weight:700;font-size:.88rem;cursor:pointer;border:none;transition:all .18s;}
+.btn-primary{background:var(--teal);color:#fff;}
+.btn-primary:hover{background:var(--teal2);transform:translateY(-1px);}
+.btn-emerald{background:var(--emerald);color:#fff;}
+.btn-emerald:hover{background:#059669;transform:translateY(-1px);}
+.btn-outline{background:transparent;color:var(--teal);border:1.5px solid var(--teal);}
+.btn-outline:hover{background:var(--teal);color:#fff;}
+.btn-ghost{background:rgba(255,255,255,.1);color:#fff;border:1.5px solid rgba(255,255,255,.2);}
+.btn-ghost:hover{background:rgba(255,255,255,.2);}
+.btn-danger{background:#FEF2F2;color:var(--rose);border:1px solid #FECACA;}
+.btn-danger:hover{background:var(--rose);color:#fff;}
+.btn-sm{padding:.38rem .9rem;font-size:.78rem;}
+.btn-xs{padding:.28rem .7rem;font-size:.72rem;}
+.btn:disabled{opacity:.45;cursor:not-allowed;transform:none!important;}
+
+/* INPUTS */
+.field{margin-bottom:.9rem;}
+.field label{display:block;font-size:.75rem;font-weight:700;color:var(--muted);margin-bottom:.35rem;letter-spacing:.04em;text-transform:uppercase;}
+.field input,.field textarea,.field select{width:100%;padding:.68rem .95rem .68rem 2.6rem;border:1.5px solid var(--border);border-radius:10px;font-family:'Nunito',sans-serif;font-size:.9rem;color:var(--ink);background:#fff;outline:none;transition:border-color .18s,box-shadow .18s;}
+.field input:focus,.field textarea:focus,.field select:focus{border-color:var(--teal);box-shadow:0 0 0 3px rgba(14,165,233,.1);}
+.field .ico{position:absolute;left:.9rem;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.9rem;pointer-events:none;}
+.field-wrap{position:relative;}
+.field-wrap label{display:block;font-size:.75rem;font-weight:700;color:var(--muted);margin-bottom:.35rem;letter-spacing:.04em;text-transform:uppercase;}
+.field textarea{padding:.68rem .95rem;resize:vertical;min-height:76px;}
+.field select{padding-left:.95rem;}
+.field-row{display:grid;grid-template-columns:1fr 1fr;gap:.9rem;}
+
+/* TAGS */
+.tag{display:inline-block;padding:.18rem .6rem;border-radius:6px;font-size:.7rem;font-weight:700;}
+.tag-blue{background:#EFF6FF;color:#1D4ED8;}
+.tag-green{background:#ECFDF5;color:#065F46;}
+.tag-amber{background:#FFFBEB;color:#92400E;}
+.tag-rose{background:#FFF1F2;color:#9F1239;}
+.tag-violet{background:#F5F3FF;color:#5B21B6;}
+
+/* ALERTS */
+.alert-err{background:#FEF2F2;border:1px solid #FECACA;color:#B91C1C;padding:.6rem .9rem;border-radius:9px;font-size:.82rem;margin-bottom:.9rem;}
+.alert-ok{background:#ECFDF5;border:1px solid #A7F3D0;color:#065F46;padding:.6rem .9rem;border-radius:9px;font-size:.82rem;margin-bottom:.9rem;}
+
+/* TOAST */
+.toast{position:fixed;bottom:1.75rem;right:1.75rem;z-index:9999;background:var(--ink);color:#fff;padding:.8rem 1.35rem;border-radius:12px;font-size:.86rem;font-weight:600;box-shadow:0 8px 28px rgba(0,0,0,.2);animation:fadeUp .3s ease;max-width:320px;}
+
+/* MODAL */
+.overlay{position:fixed;inset:0;background:rgba(15,23,42,.55);backdrop-filter:blur(4px);z-index:500;display:flex;align-items:center;justify-content:center;padding:1rem;}
+.modal{background:#fff;border-radius:18px;padding:1.75rem;width:100%;max-width:400px;animation:fadeUp .3s ease;max-height:90vh;overflow-y:auto;}
+.modal-title{font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem;margin-bottom:1.25rem;text-align:center;}
+
+/* ═══ AUTH ═══ */
+.auth-wrap{min-height:100vh;display:grid;grid-template-columns:1fr 1fr;}
+.auth-panel{background:linear-gradient(145deg,#0F172A 0%,#1E293B 55%,#0F3460 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:3rem;position:relative;overflow:hidden;}
+.auth-panel::before{content:'';position:absolute;width:480px;height:480px;border-radius:50%;background:radial-gradient(circle,rgba(14,165,233,.13),transparent 70%);top:-120px;right:-120px;}
+.auth-panel::after{content:'';position:absolute;width:360px;height:360px;border-radius:50%;background:radial-gradient(circle,rgba(16,185,129,.08),transparent 70%);bottom:-80px;left:-80px;}
+.auth-panel h1{font-family:'Syne',sans-serif;font-size:2.1rem;font-weight:800;color:#fff;text-align:center;line-height:1.2;margin-bottom:.9rem;position:relative;z-index:1;}
+.auth-panel p{color:rgba(255,255,255,.55);text-align:center;line-height:1.7;font-size:.9rem;position:relative;z-index:1;}
+.auth-globe{font-size:5rem;margin-bottom:1.5rem;position:relative;z-index:1;}
+.auth-form-wrap{display:flex;align-items:center;justify-content:center;padding:3rem 2rem;}
+.auth-form{width:100%;max-width:410px;}
+.auth-form .logo-wrap{margin-bottom:1.6rem;}
+.auth-form h2{font-family:'Syne',sans-serif;font-size:1.65rem;font-weight:800;margin-bottom:.3rem;}
+.auth-form .sub{color:var(--muted);font-size:.86rem;margin-bottom:1.6rem;}
+.auth-tabs{display:flex;background:var(--surface);border-radius:10px;padding:3px;margin-bottom:1.5rem;}
+.auth-tab{flex:1;padding:.46rem;border:none;border-radius:8px;font-family:'Nunito',sans-serif;font-size:.84rem;font-weight:700;cursor:pointer;background:transparent;color:var(--muted);transition:all .18s;}
+.auth-tab.on{background:#fff;color:var(--ink);box-shadow:0 1px 8px rgba(0,0,0,.07);}
+.auth-link{color:var(--teal);font-weight:700;cursor:pointer;font-size:.82rem;}
+.auth-link:hover{text-decoration:underline;}
+
+/* ═══ SHELL ═══ */
+.shell{display:grid;grid-template-columns:248px 1fr;min-height:100vh;}
+.sidebar{background:#fff;border-right:1px solid var(--border);display:flex;flex-direction:column;padding:1.35rem;position:sticky;top:0;height:100vh;overflow-y:auto;}
+.sidebar .logo-wrap{margin-bottom:2.25rem;padding:0 .4rem;}
+.sb-sec{margin-bottom:1.25rem;}
+.sb-lbl{font-size:.66rem;font-weight:800;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);padding:0 .65rem;margin-bottom:.4rem;}
+.nav-item{display:flex;align-items:center;gap:.7rem;padding:.62rem .65rem;border-radius:10px;cursor:pointer;font-weight:600;font-size:.88rem;color:var(--muted);transition:all .18s;margin-bottom:.15rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.nav-item:hover{background:var(--surface);color:var(--ink);}
+.nav-item.on{background:#EFF6FF;color:var(--teal2);}
+.nav-item .ni{font-size:1rem;width:20px;text-align:center;flex-shrink:0;}
+.sb-footer{margin-top:auto;padding-top:.9rem;border-top:1px solid var(--border);}
+.user-pill{display:flex;align-items:center;gap:.65rem;padding:.65rem;border-radius:12px;cursor:pointer;transition:background .18s;}
+.user-pill:hover{background:var(--surface);}
+.up-name{font-weight:700;font-size:.86rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.up-role{font-size:.7rem;color:var(--muted);}
+
+/* AVATAR */
+.av{border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:'Syne',sans-serif;font-weight:800;color:#fff;flex-shrink:0;}
+.av-xs{width:26px;height:26px;font-size:.6rem;}
+.av-sm{width:34px;height:34px;font-size:.82rem;}
+.av-md{width:46px;height:46px;font-size:1rem;}
+.av-lg{width:68px;height:68px;font-size:1.4rem;}
+.av-xl{width:88px;height:88px;font-size:1.8rem;}
+
+/* TOPBAR */
+.topbar{background:#fff;border-bottom:1px solid var(--border);padding:.85rem 1.75rem;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10;}
+.topbar h1{font-family:'Syne',sans-serif;font-size:1.2rem;font-weight:800;}
+.topbar-r{display:flex;align-items:center;gap:.65rem;}
+
+/* MAIN */
+.main{background:var(--surface);padding:1.75rem;overflow-y:auto;height:calc(100vh - 54px);}
+
+/* EMPTY STATE */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4rem 2rem;text-align:center;}
+.empty-icon{font-size:3.5rem;margin-bottom:1rem;opacity:.7;}
+.empty h3{font-family:'Syne',sans-serif;font-size:1.1rem;font-weight:800;margin-bottom:.5rem;color:var(--ink);}
+.empty p{color:var(--muted);font-size:.88rem;max-width:280px;line-height:1.6;margin-bottom:1.5rem;}
+
+/* DASHBOARD */
+.welcome{background:linear-gradient(135deg,#0F172A,#1E3A5F);border-radius:18px;padding:1.75rem 2rem;color:#fff;position:relative;overflow:hidden;margin-bottom:1.6rem;}
+.welcome::after{content:'✈';position:absolute;right:1.75rem;top:50%;transform:translateY(-50%);font-size:5rem;opacity:.06;}
+.welcome h2{font-family:'Syne',sans-serif;font-size:1.4rem;font-weight:800;margin-bottom:.35rem;}
+.welcome p{opacity:.6;font-size:.86rem;}
+.welcome-btns{display:flex;gap:.65rem;margin-top:1rem;flex-wrap:wrap;}
+.stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:.9rem;margin-bottom:1.6rem;}
+.stat-c{background:#fff;border-radius:13px;padding:1rem 1.2rem;border:1px solid var(--border);display:flex;align-items:center;gap:.85rem;}
+.stat-ico{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;}
+.stat-v{font-family:'Syne',sans-serif;font-size:1.35rem;font-weight:800;}
+.stat-l{font-size:.72rem;color:var(--muted);font-weight:600;}
+.sec-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem;}
+.sec-head h3{font-family:'Syne',sans-serif;font-size:1rem;font-weight:800;}
+.trips-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(275px,1fr));gap:1.1rem;}
+
+/* TRIP CARD */
+.trip-card{background:#fff;border-radius:16px;border:1px solid var(--border);overflow:hidden;transition:transform .18s,box-shadow .18s;cursor:pointer;}
+.trip-card:hover{transform:translateY(-3px);box-shadow:0 8px 28px rgba(0,0,0,.07);}
+.tc-thumb{height:118px;display:flex;align-items:center;justify-content:center;font-size:3rem;position:relative;}
+.tc-badge{position:absolute;top:.6rem;left:.6rem;background:rgba(0,0,0,.35);backdrop-filter:blur(4px);color:#fff;font-size:.65rem;font-weight:700;padding:.2rem .55rem;border-radius:100px;}
+.tc-seats{position:absolute;top:.6rem;right:.6rem;background:rgba(255,255,255,.92);color:var(--ink);font-size:.65rem;font-weight:700;padding:.2rem .55rem;border-radius:100px;}
+.tc-body{padding:1rem;}
+.tc-title{font-family:'Syne',sans-serif;font-weight:800;font-size:.92rem;margin-bottom:.25rem;}
+.tc-meta{font-size:.74rem;color:var(--muted);margin-bottom:.65rem;display:flex;gap:.6rem;flex-wrap:wrap;}
+.tc-members{display:flex;margin-bottom:.7rem;}
+.tc-av{width:24px;height:24px;border-radius:50%;border:2px solid #fff;margin-left:-4px;display:flex;align-items:center;justify-content:center;font-size:.55rem;font-weight:800;color:#fff;flex-shrink:0;}
+.tc-av:first-child{margin-left:0;}
+.tc-tags{display:flex;gap:.3rem;flex-wrap:wrap;}
+
+/* CHAT */
+.chat-layout{display:grid;grid-template-columns:1fr 280px;gap:1.1rem;height:calc(100vh - 9rem);}
+.chat-panel{background:#fff;border-radius:16px;border:1px solid var(--border);display:flex;flex-direction:column;overflow:hidden;}
+.chat-hdr{padding:.85rem 1.1rem;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.chat-hdr h4{font-family:'Syne',sans-serif;font-weight:800;font-size:.88rem;}
+.chat-msgs{flex:1;overflow-y:auto;padding:.85rem;display:flex;flex-direction:column;gap:.6rem;}
+.msg{display:flex;gap:.5rem;align-items:flex-end;}
+.msg.mine{flex-direction:row-reverse;}
+.bubble{max-width:72%;padding:.58rem .9rem;border-radius:16px;font-size:.84rem;line-height:1.5;word-break:break-word;}
+.msg.theirs .bubble{background:var(--surface);border-bottom-left-radius:3px;}
+.msg.mine .bubble{background:var(--teal);color:#fff;border-bottom-right-radius:3px;}
+.msg-name{font-size:.66rem;color:var(--muted);margin-bottom:.15rem;cursor:pointer;}
+.msg-time{font-size:.64rem;color:var(--muted);margin-top:.18rem;text-align:right;}
+.chat-inp-row{padding:.6rem;border-top:1px solid var(--border);display:flex;gap:.45rem;align-items:center;}
+.chat-inp{flex:1;padding:.55rem .9rem;border:1.5px solid var(--border);border-radius:100px;font-family:'Nunito',sans-serif;font-size:.84rem;outline:none;transition:border-color .18s;}
+.chat-inp:focus{border-color:var(--teal);}
+.members-pane{background:#fff;border-radius:16px;border:1px solid var(--border);padding:1.1rem;overflow-y:auto;}
+.m-row{display:flex;align-items:center;gap:.65rem;padding:.55rem .4rem;border-radius:9px;cursor:pointer;transition:background .15s;}
+.m-row:hover{background:var(--surface);}
+.m-name{font-weight:700;font-size:.82rem;}
+.m-loc{font-size:.7rem;color:var(--muted);}
+
+/* CREATE FORM */
+.create-wrap{max-width:600px;}
+.create-card{background:#fff;border-radius:16px;border:1px solid var(--border);padding:1.75rem;}
+.emoji-row{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1rem;}
+.emoji-btn{width:36px;height:36px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.15rem;cursor:pointer;border:1.5px solid var(--border);background:#fff;transition:all .18s;}
+.emoji-btn.sel{border-color:var(--teal);background:#EFF6FF;}
+
+/* PROFILE */
+.prof-wrap{max-width:620px;}
+.prof-hero{background:linear-gradient(135deg,#0F172A,#1E3A5F);border-radius:18px;padding:2rem;display:flex;align-items:center;gap:1.5rem;margin-bottom:1.1rem;position:relative;overflow:hidden;}
+.prof-hero::after{content:'🌍';position:absolute;right:1.75rem;top:50%;transform:translateY(-50%);font-size:5rem;opacity:.06;}
+.prof-hero-info h2{font-family:'Syne',sans-serif;font-size:1.35rem;font-weight:800;color:#fff;}
+.prof-hero-info p{color:rgba(255,255,255,.5);font-size:.82rem;margin-top:.2rem;}
+.prof-sec{background:#fff;border-radius:16px;border:1px solid var(--border);padding:1.35rem;margin-bottom:.9rem;}
+.prof-sec h4{font-family:'Syne',sans-serif;font-size:.88rem;font-weight:800;margin-bottom:1rem;display:flex;align-items:center;justify-content:space-between;}
+.info-row{display:flex;align-items:center;justify-content:space-between;padding:.42rem 0;border-bottom:1px solid var(--border);font-size:.85rem;}
+.info-row:last-of-type{border-bottom:none;}
+.info-lbl{font-weight:700;color:var(--text);}
+.info-val{color:var(--muted);text-align:right;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* EXPLORE FILTERS */
+.filter-row{display:flex;gap:.35rem;flex-wrap:wrap;margin-bottom:1.25rem;}
+.filter-btn{padding:.36rem .82rem;border-radius:100px;border:1.5px solid var(--border);background:#fff;color:var(--muted);font-family:'Nunito',sans-serif;font-weight:700;font-size:.76rem;cursor:pointer;transition:all .18s;}
+.filter-btn:hover{border-color:var(--teal);color:var(--teal);}
+.filter-btn.on{border-color:var(--teal);background:var(--teal);color:#fff;}
+
+/* SEARCH */
+.search-wrap{position:relative;margin-bottom:1rem;}
+.search-wrap input{width:100%;padding:.62rem .95rem .62rem 2.5rem;border:1.5px solid var(--border);border-radius:10px;font-family:'Nunito',sans-serif;font-size:.86rem;outline:none;transition:border-color .18s;background:#fff;}
+.search-wrap input:focus{border-color:var(--teal);}
+.search-wrap .s-ico{position:absolute;left:.85rem;top:50%;transform:translateY(-50%);color:var(--muted);font-size:.9rem;}
+
+/* HOST BADGE */
+.host-badge{font-size:.64rem;background:#FFFBEB;color:#92400E;border:1px solid #FDE68A;padding:.12rem .45rem;border-radius:100px;font-weight:700;margin-left:.4rem;}
+
+/* DIVIDER */
+.divider{display:flex;align-items:center;gap:.75rem;color:var(--muted);font-size:.78rem;margin:.9rem 0;}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border);}
+
+@media(max-width:860px){
+  .shell{grid-template-columns:1fr;}
+  .sidebar{display:none;}
+  .auth-wrap{grid-template-columns:1fr;}
+  .auth-panel{display:none;}
+  .stats-row{grid-template-columns:1fr 1fr;}
+  .chat-layout{grid-template-columns:1fr;height:auto;}
+  .field-row{grid-template-columns:1fr;}
+}
+</style>
 </head>
 <body>
-  <div id="root"></div>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef} = React;
 
-  <!-- Load components & pages in order -->
-  <script type="text/babel" src="components/Logo.js"></script>
-  <script type="text/babel" src="components/Avatar.js"></script>
-  <script type="text/babel" src="components/Toast.js"></script>
-  <script type="text/babel" src="components/TripCard.js"></script>
-  <script type="text/babel" src="components/UserModal.js"></script>
-  <script type="text/babel" src="utils/api.js"></script>
-  <script type="text/babel" src="pages/LoginPage.js"></script>
-  <script type="text/babel" src="pages/RegisterPage.js"></script>
-  <script type="text/babel" src="pages/DashboardPage.js"></script>
-  <script type="text/babel" src="pages/ExplorePage.js"></script>
-  <script type="text/babel" src="pages/ChatPage.js"></script>
-  <script type="text/babel" src="pages/CreateTripPage.js"></script>
-  <script type="text/babel" src="pages/ProfilePage.js"></script>
-  <script type="text/babel" src="App.js"></script>
+/* ── CONSTANTS ── */
+const COLORS=['#0EA5E9','#10B981','#F59E0B','#8B5CF6','#F43F5E','#06B6D4','#84CC16','#EC4899'];
+const GRADS=[
+  'linear-gradient(135deg,#0EA5E9,#6366F1)',
+  'linear-gradient(135deg,#10B981,#0EA5E9)',
+  'linear-gradient(135deg,#F59E0B,#EF4444)',
+  'linear-gradient(135deg,#8B5CF6,#EC4899)',
+  'linear-gradient(135deg,#06B6D4,#10B981)',
+  'linear-gradient(135deg,#F43F5E,#F59E0B)',
+];
+const aColor=n=>COLORS[(n||'A').charCodeAt(0)%COLORS.length];
+const fmt=()=>{const d=new Date();return d.getHours().toString().padStart(2,'0')+':'+d.getMinutes().toString().padStart(2,'0');};
+const uid=()=>'id_'+Math.random().toString(36).slice(2,9);
+
+/* ── LOCALSTORAGE ── */
+const LS = {
+  get:(k,def)=>{try{const v=window.localStorage.getItem(k);return v?JSON.parse(v):def;}catch{return def;}},
+  set:(k,v)=>{try{window.localStorage.setItem(k,JSON.stringify(v));}catch{}},
+};
+
+/* ── LOGO ── */
+function Logo({size=1}){
+  return(
+    <div className="logo-wrap">
+      <svg width={30*size} height={30*size} viewBox="0 0 30 30" fill="none">
+        <circle cx="15" cy="15" r="15" fill="#0EA5E9"/>
+        <circle cx="15" cy="15" r="9" fill="none" stroke="white" strokeWidth="1.3"/>
+        <ellipse cx="15" cy="15" rx="4.2" ry="9" fill="none" stroke="white" strokeWidth="1.3"/>
+        <line x1="6" y1="15" x2="24" y2="15" stroke="white" strokeWidth="1.3"/>
+        <polygon points="21,8.5 25,11 21,9.5" fill="#F59E0B"/>
+        <circle cx="21" cy="8.5" r="1.8" fill="#F59E0B"/>
+      </svg>
+      <span className="logo-text" style={{fontSize:`${1.3*size}rem`}}>Travel<em>Buddy</em></span>
+    </div>
+  );
+}
+
+/* ── AVATAR ── */
+function Av({name,size='md',onClick}){
+  const cls={xs:'av-xs',sm:'av-sm',md:'av-md',lg:'av-lg',xl:'av-xl'}[size]||'av-md';
+  return <div className={`av ${cls}`} style={{background:aColor(name||'?'),cursor:onClick?'pointer':'default',flexShrink:0}} onClick={onClick}>{(name||'?')[0].toUpperCase()}</div>;
+}
+
+/* ── TOAST ── */
+function Toast({msg,onDone}){
+  useEffect(()=>{const t=setTimeout(onDone,3200);return()=>clearTimeout(t);},[]);
+  return <div className="toast">{msg}</div>;
+}
+
+/* ══════════════════════════════
+   AUTH
+══════════════════════════════ */
+function AuthScreen({onLogin,users,setUsers}){
+  const [tab,setTab]=useState('login');
+  const [view,setView]=useState('auth');
+  const [f,setF]=useState({name:'',email:'',pw:'',pw2:'',loc:'',bio:''});
+  const [err,setErr]=useState('');
+  const [ok,setOk]=useState('');
+  const s=(k,v)=>setF(p=>({...p,[k]:v}));
+
+  const login=()=>{
+    setErr('');
+    if(!f.email||!f.pw){setErr('Please fill all fields.');return;}
+    const u=users.find(x=>x.email.toLowerCase()===f.email.toLowerCase()&&x.password===f.pw);
+    if(!u){setErr('Incorrect email or password.');return;}
+    onLogin(u);
+  };
+  const register=()=>{
+    setErr('');
+    if(!f.name||!f.email||!f.pw||!f.pw2){setErr('Please fill all required fields.');return;}
+    if(!f.email.includes('@')||!f.email.includes('.')){setErr('Enter a valid email address.');return;}
+    if(f.pw.length<6){setErr('Password must be at least 6 characters.');return;}
+    if(f.pw!==f.pw2){setErr('Passwords do not match.');return;}
+    if(users.find(x=>x.email.toLowerCase()===f.email.toLowerCase())){setErr('An account with this email already exists.');return;}
+    const nu={id:uid(),name:f.name.trim(),email:f.email.trim(),password:f.pw,location:f.loc.trim()||'Earth 🌍',bio:f.bio.trim()||'New traveler ready to explore!',interests:[],joinedAt:new Date().toISOString()};
+    const updated=[...users,nu];
+    setUsers(updated);
+    LS.set('tb_users',updated);
+    onLogin(nu);
+  };
+  const forgot=()=>{
+    setErr('');setOk('');
+    if(!f.email){setErr('Enter your registered email.');return;}
+    const u=users.find(x=>x.email.toLowerCase()===f.email.toLowerCase());
+    if(!u){setErr('No account found with that email.');return;}
+    setOk(`A reset link has been sent to ${f.email}. (Demo: your password is "${u.password}")`);
+  };
+
+  return(
+    <div className="auth-wrap">
+      <div className="auth-panel">
+        <div className="auth-globe float">🌍</div>
+        <h1>Find Your Perfect Travel Companion</h1>
+        <p style={{marginTop:'.65rem',position:'relative',zIndex:1}}>
+          Create real trips, meet real travelers, build real memories together. No fake profiles. No fake numbers.
+        </p>
+        <div style={{display:'flex',gap:'1.75rem',marginTop:'2rem',position:'relative',zIndex:1}}>
+          {[['100%','Real users'],['0','Fake data'],['∞','Adventures']].map(([n,l])=>(
+            <div key={l} style={{textAlign:'center',color:'rgba(255,255,255,.75)'}}>
+              <div style={{fontFamily:'Syne,sans-serif',fontSize:'1.6rem',fontWeight:800,color:'#0EA5E9'}}>{n}</div>
+              <span style={{fontSize:'.7rem',display:'block',marginTop:'.2rem'}}>{l}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="auth-form-wrap">
+        <div className="auth-form fade-up">
+          <Logo/>
+          {view==='forgot'?(
+            <>
+              <h2>Reset Password</h2>
+              <p className="sub">Enter your email and we'll send a reset link.</p>
+              {err&&<div className="alert-err">{err}</div>}
+              {ok&&<div className="alert-ok">{ok}</div>}
+              <div className="field"><label>Email Address</label><div className="field-wrap"><span className="ico">📧</span><input type="email" placeholder="your@email.com" value={f.email} onChange={e=>s('email',e.target.value)}/></div></div>
+              <button className="btn btn-primary" style={{width:'100%',padding:'.78rem'}} onClick={forgot}>Send Reset Link</button>
+              <p style={{textAlign:'center',marginTop:'1rem',fontSize:'.83rem',color:'var(--muted)'}}>
+                <span className="auth-link" onClick={()=>{setView('auth');setErr('');setOk('');}}>← Back to login</span>
+              </p>
+            </>
+          ):(
+            <>
+              <h2>{tab==='login'?'Welcome back 👋':'Join Travel Buddy 🚀'}</h2>
+              <p className="sub">{tab==='login'?'Sign in to your account':'Create your free account — no fake data, just real travel'}</p>
+              <div className="auth-tabs">
+                <button className={`auth-tab ${tab==='login'?'on':''}`} onClick={()=>{setTab('login');setErr('');}}>Sign In</button>
+                <button className={`auth-tab ${tab==='register'?'on':''}`} onClick={()=>{setTab('register');setErr('');}}>Register</button>
+              </div>
+              {err&&<div className="alert-err">{err}</div>}
+              {tab==='register'&&(
+                <div className="field"><label>Full Name *</label><div className="field-wrap"><span className="ico">👤</span><input placeholder="Your full name" value={f.name} onChange={e=>s('name',e.target.value)}/></div></div>
+              )}
+              <div className="field"><label>Email Address *</label><div className="field-wrap"><span className="ico">📧</span><input type="email" placeholder="your@email.com" value={f.email} onChange={e=>s('email',e.target.value)}/></div></div>
+              <div className="field"><label>Password *</label><div className="field-wrap"><span className="ico">🔒</span><input type="password" placeholder="Min. 6 characters" value={f.pw} onChange={e=>s('pw',e.target.value)}/></div></div>
+              {tab==='register'&&<>
+                <div className="field"><label>Confirm Password *</label><div className="field-wrap"><span className="ico">🔒</span><input type="password" placeholder="Repeat your password" value={f.pw2} onChange={e=>s('pw2',e.target.value)}/></div></div>
+                <div className="divider">optional details</div>
+                <div className="field"><label>Location</label><div className="field-wrap"><span className="ico">📍</span><input placeholder="City, Country" value={f.loc} onChange={e=>s('loc',e.target.value)}/></div></div>
+                <div className="field"><label>Bio</label><textarea className="field" placeholder="Tell fellow travelers about yourself..." value={f.bio} onChange={e=>s('bio',e.target.value)} style={{padding:'.65rem .95rem',border:'1.5px solid var(--border)',borderRadius:10,fontFamily:'Nunito,sans-serif',fontSize:'.9rem',width:'100%',outline:'none',resize:'vertical',minHeight:76}}/></div>
+              </>}
+              {tab==='login'&&<div style={{textAlign:'right',marginBottom:'.85rem'}}><span className="auth-link" onClick={()=>{setView('forgot');setErr('');setOk('');}}>Forgot password?</span></div>}
+              <button className="btn btn-primary" style={{width:'100%',padding:'.78rem'}} onClick={tab==='login'?login:register}>
+                {tab==='login'?'Sign In →':'Create Account →'}
+              </button>
+              {tab==='login'&&<p style={{textAlign:'center',marginTop:'.85rem',fontSize:'.82rem',color:'var(--muted)'}}>
+                Don't have an account? <span className="auth-link" onClick={()=>{setTab('register');setErr('');}}>Register free</span>
+              </p>}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════
+   TRIP CARD
+══════════════════════════════ */
+function TripCard({trip,user,onJoin,onOpen,joined,users}){
+  const isHost=trip.hostId===user.id;
+  const memberAvatars=trip.memberIds.slice(0,4);
+  return(
+    <div className="trip-card" onClick={()=>joined&&onOpen(trip.id)}>
+      <div className="tc-thumb" style={{background:trip.grad}}>
+        <span>{trip.emoji}</span>
+        <span className="tc-badge">{trip.style}</span>
+        <span className="tc-seats">{trip.seats>0?`${trip.seats} seat${trip.seats!==1?'s':''} left`:'Full'}</span>
+      </div>
+      <div className="tc-body">
+        <div className="tc-title">{trip.title}</div>
+        <div className="tc-meta">
+          <span>📍 {trip.dest}</span>
+          <span>📅 {trip.dates}</span>
+          <span>💰 {trip.budget}</span>
+        </div>
+        <div className="tc-members">
+          {memberAvatars.map((mid,i)=>{
+            const mu=users.find(u=>u.id===mid);
+            return <div key={mid} className="tc-av" style={{background:aColor(mu?.name||'?'),zIndex:10-i}}>{(mu?.name||'?')[0].toUpperCase()}</div>;
+          })}
+          {trip.memberIds.length>4&&<div className="tc-av" style={{background:'#94A3B8'}}>+{trip.memberIds.length-4}</div>}
+        </div>
+        <div className="tc-tags">
+          {(trip.tags||[]).map((tg,i)=><span key={tg} className={`tag ${['tag-blue','tag-green','tag-amber','tag-violet','tag-rose'][i%5]}`}>{tg}</span>)}
+        </div>
+        <div style={{marginTop:'.85rem',display:'flex',gap:'.45rem',alignItems:'center'}}>
+          {joined?(
+            <button className="btn btn-primary btn-sm" style={{flex:1}} onClick={e=>{e.stopPropagation();onOpen(trip.id);}}>💬 Open Chat</button>
+          ):trip.seats>0?(
+            <button className="btn btn-emerald btn-sm" style={{flex:1}} onClick={e=>{e.stopPropagation();onJoin(trip.id);}}>✈️ Join Trip</button>
+          ):(
+            <button className="btn btn-sm" style={{flex:1,background:'var(--surface)',color:'var(--muted)',cursor:'not-allowed'}} disabled>Trip Full</button>
+          )}
+          {isHost&&<span style={{fontSize:'.68rem',color:'var(--amber)',fontWeight:700}}>👑 Your trip</span>}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════
+   DASHBOARD
+══════════════════════════════ */
+function Dashboard({user,trips,users,onJoin,onOpen,setPage}){
+  const myTrips=trips.filter(t=>t.memberIds.includes(user.id));
+  const openTrips=trips.filter(t=>!t.memberIds.includes(user.id)&&t.seats>0);
+
+  return(
+    <div className="fade-up">
+      <div className="welcome">
+        <h2>Hey {user.name.split(' ')[0]}, welcome back! 👋</h2>
+        <p>{openTrips.length>0?`${openTrips.length} trip${openTrips.length!==1?'s are':' is'} looking for companions right now.`:'Be the first to create a trip for others to join!'}</p>
+        <div className="welcome-btns">
+          <button className="btn btn-emerald btn-sm" onClick={()=>setPage('create')}>+ Create a Trip</button>
+          <button className="btn btn-ghost btn-sm" onClick={()=>setPage('explore')}>Explore Trips →</button>
+        </div>
+      </div>
+
+      <div className="stats-row">
+        {[
+          {ico:'✈️',bg:'#EFF6FF',v:myTrips.length,l:'My Trips'},
+          {ico:'👥',bg:'#ECFDF5',v:trips.reduce((a,t)=>a+t.memberIds.length,0),l:'Total Travelers'},
+          {ico:'🌍',bg:'#F5F3FF',v:trips.length,l:'Active Trips'},
+        ].map(s=>(
+          <div key={s.l} className="stat-c">
+            <div className="stat-ico" style={{background:s.bg}}>{s.ico}</div>
+            <div><div className="stat-v">{s.v}</div><div className="stat-l">{s.l}</div></div>
+          </div>
+        ))}
+      </div>
+
+      {myTrips.length>0&&<>
+        <div className="sec-head"><h3>✈️ My Trips</h3></div>
+        <div className="trips-grid" style={{marginBottom:'1.75rem'}}>
+          {myTrips.map(t=><TripCard key={t.id} trip={t} user={user} users={users} onOpen={onOpen} joined/>)}
+        </div>
+      </>}
+
+      <div className="sec-head">
+        <h3>🌍 Discover Trips</h3>
+        {openTrips.length>0&&<button className="btn btn-outline btn-sm" onClick={()=>setPage('explore')}>View All</button>}
+      </div>
+      {openTrips.length>0?(
+        <div className="trips-grid">
+          {openTrips.slice(0,3).map(t=><TripCard key={t.id} trip={t} user={user} users={users} onJoin={onJoin} onOpen={onOpen}/>)}
+        </div>
+      ):(
+        <div className="empty" style={{background:'#fff',borderRadius:16,border:'1px solid var(--border)'}}>
+          <div className="empty-icon">🗺️</div>
+          <h3>No trips yet</h3>
+          <p>Be the first adventurer! Create a trip and let others join you.</p>
+          <button className="btn btn-primary" onClick={()=>setPage('create')}>Create First Trip</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════
+   EXPLORE
+══════════════════════════════ */
+function ExplorePage({trips,user,users,onJoin,onOpen}){
+  const [q,setQ]=useState('');
+  const [fil,setFil]=useState('All');
+  const styles=['All','Adventure','Culture','Relaxation','Backpacking','Photography','Food & Nightlife'];
+  const list=trips.filter(t=>{
+    const sq=t.title.toLowerCase().includes(q.toLowerCase())||t.dest.toLowerCase().includes(q.toLowerCase());
+    const sf=fil==='All'||t.style===fil||(t.tags||[]).some(g=>g.toLowerCase().includes(fil.toLowerCase()));
+    return sq&&sf;
+  });
+  return(
+    <div className="fade-up">
+      <div style={{marginBottom:'1.25rem'}}>
+        <h2 style={{fontFamily:'Syne,sans-serif',fontWeight:800,fontSize:'1.25rem',marginBottom:'.35rem'}}>🌍 Explore All Trips</h2>
+        <p style={{color:'var(--muted)',fontSize:'.85rem'}}>Find your perfect adventure and meet amazing travel companions.</p>
+      </div>
+      <div className="search-wrap">
+        <span className="s-ico">🔍</span>
+        <input placeholder="Search by destination or trip name..." value={q} onChange={e=>setQ(e.target.value)}/>
+      </div>
+      <div className="filter-row">
+        {styles.map(fi=>(
+          <button key={fi} className={`filter-btn ${fil===fi?'on':''}`} onClick={()=>setFil(fi)}>{fi}</button>
+        ))}
+      </div>
+      {list.length>0?(
+        <div className="trips-grid">
+          {list.map(t=>{
+            const joined=t.memberIds.includes(user.id);
+            return <TripCard key={t.id} trip={t} user={user} users={users} onJoin={onJoin} onOpen={onOpen} joined={joined}/>;
+          })}
+        </div>
+      ):(
+        <div className="empty" style={{background:'#fff',borderRadius:16,border:'1px solid var(--border)'}}>
+          <div className="empty-icon">🔍</div>
+          <h3>No trips found</h3>
+          <p>{q?`No trips match "${q}". Try a different search.`:'No trips available right now. Create the first one!'}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════
+   CHAT PAGE
+══════════════════════════════ */
+function ChatPage({trip,user,users,allTrips,onBack,onViewUser,onUpdateTrip}){
+  const [msgs,setMsgs]=useState(trip.messages||[]);
+  const [inp,setInp]=useState('');
+  const btm=useRef(null);
+  useEffect(()=>btm.current?.scrollIntoView({behavior:'smooth'}),[msgs]);
+
+  const members=trip.memberIds.map(id=>users.find(u=>u.id===id)).filter(Boolean);
+
+  const send=()=>{
+    if(!inp.trim())return;
+    const newMsg={id:uid(),userId:user.id,text:inp.trim(),time:fmt()};
+    const updatedMsgs=[...msgs,newMsg];
+    setMsgs(updatedMsgs);
+    setInp('');
+    onUpdateTrip({...trip,messages:updatedMsgs});
+  };
+
+  return(
+    <div style={{height:'calc(100vh - 5rem)'}}>
+      <div style={{display:'flex',alignItems:'center',gap:'.9rem',marginBottom:'.9rem'}}>
+        <button className="btn btn-outline btn-sm" onClick={onBack}>← Back</button>
+        <div>
+          <h2 style={{fontFamily:'Syne,sans-serif',fontWeight:800,fontSize:'1.1rem'}}>{trip.emoji} {trip.title}</h2>
+          <p style={{fontSize:'.74rem',color:'var(--muted)'}}>📍 {trip.dest} · 📅 {trip.dates} · {members.length} member{members.length!==1?'s':''}</p>
+        </div>
+      </div>
+      <div className="chat-layout">
+        <div className="chat-panel">
+          <div className="chat-hdr">
+            <h4>💬 Group Chat</h4>
+            <span style={{fontSize:'.72rem',color:'var(--muted)'}}>{members.length} member{members.length!==1?'s':''}</span>
+          </div>
+          <div className="chat-msgs">
+            <div style={{textAlign:'center',fontSize:'.72rem',color:'var(--muted)',padding:'.65rem',background:'var(--surface)',borderRadius:8}}>
+              {trip.emoji} {trip.title} group chat — say hello!
+            </div>
+            {msgs.length===0&&(
+              <div className="empty" style={{padding:'2rem'}}>
+                <div style={{fontSize:'2rem',marginBottom:'.5rem'}}>👋</div>
+                <p style={{fontSize:'.82rem',color:'var(--muted)'}}>No messages yet. Start the conversation!</p>
+              </div>
+            )}
+            {msgs.map(m=>{
+              const sndr=users.find(u=>u.id===m.userId);
+              const mine=m.userId===user.id;
+              return(
+                <div key={m.id} className={`msg ${mine?'mine':'theirs'}`}>
+                  {!mine&&<Av name={sndr?.name||'?'} size="xs" onClick={()=>onViewUser(m.userId)}/>}
+                  <div>
+                    {!mine&&<div className="msg-name" onClick={()=>onViewUser(m.userId)}>{sndr?.name||'Unknown'}</div>}
+                    <div className="bubble">{m.text}</div>
+                    <div className="msg-time">{m.time}</div>
+                  </div>
+                </div>
+              );
+            })}
+            <div ref={btm}/>
+          </div>
+          <div className="chat-inp-row">
+            <input className="chat-inp" placeholder="Type a message… press Enter to send" value={inp} onChange={e=>setInp(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}}/>
+            <button className="btn btn-primary btn-sm" onClick={send}>Send</button>
+          </div>
+        </div>
+        <div className="members-pane">
+          <h4 style={{fontFamily:'Syne,sans-serif',fontWeight:800,fontSize:'.88rem',marginBottom:'.85rem'}}>👥 Members ({members.length})</h4>
+          {members.map(m=>(
+            <div key={m.id} className="m-row" onClick={()=>onViewUser(m.id)}>
+              <Av name={m.name} size="sm"/>
+              <div>
+                <div className="m-name">{m.name}{m.id===trip.hostId&&<span className="host-badge">Host</span>}</div>
+                <div className="m-loc">📍 {m.location}</div>
+              </div>
+            </div>
+          ))}
+          <div style={{marginTop:'.85rem',fontSize:'.75rem',color:'var(--muted)',background:'var(--surface)',borderRadius:9,padding:'.65rem',lineHeight:1.5}}>
+            Tap a member's name to view their profile.
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════
+   CREATE TRIP
+══════════════════════════════ */
+function CreatePage({user,onCreate,setPage}){
+  const emojis=['🌴','🗼','🏔️','🕌','🌊','🏯','🎭','🦁','🏝️','🌋','🎪','🏕️'];
+  const [f,setF]=useState({title:'',dest:'',emoji:'🌴',dates:'',duration:'',budget:'Mid-range',style:'Adventure',seats:'4',tags:''});
+  const [err,setErr]=useState('');
+  const s=(k,v)=>setF(p=>({...p,[k]:v}));
+
+  const create=()=>{
+    setErr('');
+    if(!f.title.trim()){setErr('Please enter a trip title.');return;}
+    if(!f.dest.trim()){setErr('Please enter a destination.');return;}
+    if(!f.dates.trim()){setErr('Please enter the dates.');return;}
+    const totalSeats=Math.max(2,parseInt(f.seats)||4);
+    const trip={
+      id:uid(),title:f.title.trim(),dest:f.dest.trim(),emoji:f.emoji,
+      grad:GRADS[Math.floor(Math.random()*GRADS.length)],
+      dates:f.dates.trim(),duration:f.duration.trim()||'TBD',
+      budget:f.budget,style:f.style,
+      seats:totalSeats-1,total:totalSeats,
+      tags:f.tags.split(',').map(t=>t.trim()).filter(Boolean).slice(0,4),
+      memberIds:[user.id],hostId:user.id,
+      messages:[{id:uid(),userId:user.id,text:`Hey everyone! I created this trip to ${f.dest.trim()}. Who's joining? 🎉`,time:fmt()}],
+      createdAt:new Date().toISOString(),
+    };
+    onCreate(trip);
+    setPage('dashboard');
+  };
+
+  return(
+    <div className="create-wrap fade-up">
+      <div style={{marginBottom:'1.25rem'}}>
+        <h2 style={{fontFamily:'Syne,sans-serif',fontWeight:800,fontSize:'1.25rem',marginBottom:'.35rem'}}>✈️ Create a New Trip</h2>
+        <p style={{color:'var(--muted)',fontSize:'.85rem'}}>Share your travel plans and find real companions to join you.</p>
+      </div>
+      <div className="create-card">
+        {err&&<div className="alert-err">{err}</div>}
+        <div style={{marginBottom:'1rem'}}>
+          <label style={{fontSize:'.75rem',fontWeight:700,color:'var(--muted)',textTransform:'uppercase',letterSpacing:'.04em',display:'block',marginBottom:'.45rem'}}>Pick an Emoji</label>
+          <div className="emoji-row">
+            {emojis.map(e=><button key={e} className={`emoji-btn ${f.emoji===e?'sel':''}`} onClick={()=>s('emoji',e)}>{e}</button>)}
+          </div>
+        </div>
+        <div className="field"><label>Trip Title *</label><div className="field-wrap"><span className="ico">✏️</span><input placeholder="e.g. Bali Adventure 2025" value={f.title} onChange={e=>s('title',e.target.value)}/></div></div>
+        <div className="field"><label>Destination *</label><div className="field-wrap"><span className="ico">📍</span><input placeholder="e.g. Bali, Indonesia" value={f.dest} onChange={e=>s('dest',e.target.value)}/></div></div>
+        <div className="field"><label>Dates *</label><div className="field-wrap"><span className="ico">📅</span><input placeholder="e.g. Apr 10–20, 2025" value={f.dates} onChange={e=>s('dates',e.target.value)}/></div></div>
+        <div className="field-row">
+          <div className="field"><label>Duration</label><div className="field-wrap"><span className="ico">⏱️</span><input placeholder="e.g. 10 days" value={f.duration} onChange={e=>s('duration',e.target.value)}/></div></div>
+          <div className="field"><label>Total Seats (incl. you)</label><div className="field-wrap"><span className="ico">👥</span><input type="number" min="2" max="20" value={f.seats} onChange={e=>s('seats',e.target.value)}/></div></div>
+        </div>
+        <div className="field-row">
+          <div className="field"><label>Budget</label><select value={f.budget} onChange={e=>s('budget',e.target.value)}>{['Budget','Mid-range','Comfortable','Luxury'].map(b=><option key={b}>{b}</option>)}</select></div>
+          <div className="field"><label>Travel Style</label><select value={f.style} onChange={e=>s('style',e.target.value)}>{['Adventure','Culture','Relaxation','Backpacking','Photography','Food & Nightlife'].map(st=><option key={st}>{st}</option>)}</select></div>
+        </div>
+        <div className="field"><label>Tags (comma separated, max 4)</label><div className="field-wrap"><span className="ico">🏷️</span><input placeholder="e.g. Beach, Surfing, Sunset" value={f.tags} onChange={e=>s('tags',e.target.value)}/></div></div>
+        <div style={{display:'flex',gap:'.65rem'}}>
+          <button className="btn btn-primary" style={{flex:1,padding:'.75rem'}} onClick={create}>🚀 Launch Trip</button>
+          <button className="btn btn-outline" onClick={()=>setPage('dashboard')}>Cancel</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════
+   PROFILE PAGE
+══════════════════════════════ */
+function ProfilePage({user,onUpdate,onLogout,showToast}){
+  const [editing,setEditing]=useState(false);
+  const [f,setF]=useState({name:user.name,email:user.email,loc:user.location,bio:user.bio,interests:(user.interests||[]).join(', ')});
+  const [pw,setPw]=useState({old:'',n1:'',n2:''});
+  const [pwErr,setPwErr]=useState('');
+  const [pwOk,setPwOk]=useState('');
+  const s=(k,v)=>setF(p=>({...p,[k]:v}));
+  const sp=(k,v)=>setPw(p=>({...p,[k]:v}));
+
+  const save=()=>{
+    if(!f.name.trim()||!f.email.trim()){showToast('Name and email are required.');return;}
+    if(!f.email.includes('@')){showToast('Enter a valid email.');return;}
+    onUpdate({...user,name:f.name.trim(),email:f.email.trim(),location:f.loc.trim(),bio:f.bio.trim(),interests:f.interests.split(',').map(i=>i.trim()).filter(Boolean)});
+    setEditing(false);
+    showToast('✅ Profile updated!');
+  };
+
+  const changePw=()=>{
+    setPwErr('');setPwOk('');
+    if(!pw.old||!pw.n1||!pw.n2){setPwErr('Fill all password fields.');return;}
+    if(pw.old!==user.password){setPwErr('Current password is incorrect.');return;}
+    if(pw.n1.length<6){setPwErr('New password must be at least 6 characters.');return;}
+    if(pw.n1!==pw.n2){setPwErr('New passwords do not match.');return;}
+    onUpdate({...user,password:pw.n1});
+    setPwOk('Password changed successfully!');
+    setPw({old:'',n1:'',n2:''});
+  };
+
+  const joined=new Date(user.joinedAt||Date.now()).toLocaleDateString('en-IN',{year:'numeric',month:'short',day:'numeric'});
+
+  return(
+    <div className="prof-wrap fade-up">
+      <div className="prof-hero">
+        <Av name={user.name} size="xl"/>
+        <div className="prof-hero-info">
+          <h2>{user.name}</h2>
+          <p>📧 {user.email}</p>
+          <p>📍 {user.location}</p>
+          <p style={{marginTop:'.3rem'}}>🗓️ Joined {joined}</p>
+          <div style={{display:'flex',gap:'.35rem',marginTop:'.6rem',flexWrap:'wrap'}}>
+            {(user.interests||[]).map(i=><span key={i} style={{background:'rgba(255,255,255,.14)',color:'#fff',fontSize:'.7rem',padding:'.15rem .55rem',borderRadius:100}}>{i}</span>)}
+          </div>
+        </div>
+      </div>
+
+      <div className="prof-sec">
+        <h4>👤 Personal Info
+          {!editing&&<button className="btn btn-outline btn-sm" onClick={()=>setEditing(true)}>Edit Profile</button>}
+        </h4>
+        {editing?(
+          <>
+            <div className="field"><label>Full Name *</label><div className="field-wrap"><span className="ico">👤</span><input value={f.name} onChange={e=>s('name',e.target.value)}/></div></div>
+            <div className="field"><label>Email *</label><div className="field-wrap"><span className="ico">📧</span><input value={f.email} onChange={e=>s('email',e.target.value)}/></div></div>
+            <div className="field"><label>Location</label><div className="field-wrap"><span className="ico">📍</span><input value={f.loc} onChange={e=>s('loc',e.target.value)}/></div></div>
+            <div className="field"><label>Bio</label><textarea style={{padding:'.65rem .95rem',border:'1.5px solid var(--border)',borderRadius:10,fontFamily:'Nunito,sans-serif',fontSize:'.88rem',width:'100%',outline:'none',resize:'vertical',minHeight:76}} value={f.bio} onChange={e=>s('bio',e.target.value)}/></div>
+            <div className="field"><label>Interests (comma separated)</label><div className="field-wrap"><span className="ico">🏷️</span><input placeholder="e.g. Hiking, Photography, Food" value={f.interests} onChange={e=>s('interests',e.target.value)}/></div></div>
+            <div style={{display:'flex',gap:'.55rem'}}>
+              <button className="btn btn-primary btn-sm" onClick={save}>Save Changes</button>
+              <button className="btn btn-outline btn-sm" onClick={()=>setEditing(false)}>Cancel</button>
+            </div>
+          </>
+        ):(
+          [['👤 Name',user.name],['📧 Email',user.email],['📍 Location',user.location],['✏️ Bio',user.bio||'Not set']].map(([l,v])=>(
+            <div key={l} className="info-row"><span className="info-lbl">{l}</span><span className="info-val">{v}</span></div>
+          ))
+        )}
+      </div>
+
+      <div className="prof-sec">
+        <h4>🔒 Change Password</h4>
+        {pwErr&&<div className="alert-err">{pwErr}</div>}
+        {pwOk&&<div className="alert-ok">{pwOk}</div>}
+        <div className="field"><label>Current Password</label><div className="field-wrap"><span className="ico">🔒</span><input type="password" placeholder="Your current password" value={pw.old} onChange={e=>sp('old',e.target.value)}/></div></div>
+        <div className="field-row">
+          <div className="field"><label>New Password</label><div className="field-wrap"><span className="ico">🔑</span><input type="password" placeholder="Min. 6 characters" value={pw.n1} onChange={e=>sp('n1',e.target.value)}/></div></div>
+          <div className="field"><label>Confirm New</label><div className="field-wrap"><span className="ico">🔑</span><input type="password" placeholder="Repeat new password" value={pw.n2} onChange={e=>sp('n2',e.target.value)}/></div></div>
+        </div>
+        <button className="btn btn-primary btn-sm" onClick={changePw}>Update Password</button>
+      </div>
+
+      <div className="prof-sec">
+        <h4>⚠️ Account</h4>
+        <p style={{fontSize:'.82rem',color:'var(--muted)',marginBottom:'.9rem'}}>Logging out will end your current session. Your data will be saved.</p>
+        <button className="btn btn-danger btn-sm" onClick={onLogout}>🚪 Logout</button>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════
+   USER PROFILE MODAL
+══════════════════════════════ */
+function UserModal({uid_,users,onClose}){
+  const u=users.find(x=>x.id===uid_);
+  if(!u)return null;
+  return(
+    <div className="overlay" onClick={onClose}>
+      <div className="modal" onClick={e=>e.stopPropagation()}>
+        <div style={{display:'flex',flexDirection:'column',alignItems:'center',marginBottom:'1.25rem'}}>
+          <Av name={u.name} size="lg"/>
+          <h3 style={{marginTop:'.85rem',marginBottom:'.22rem',fontFamily:'Syne,sans-serif',fontWeight:800,fontSize:'1.1rem',textAlign:'center'}}>{u.name}</h3>
+          <p style={{color:'var(--muted)',fontSize:'.8rem'}}>📍 {u.location}</p>
+        </div>
+        <div style={{background:'var(--surface)',borderRadius:10,padding:'.85rem',marginBottom:'.85rem',fontSize:'.84rem',lineHeight:1.6,color:'var(--text)'}}>{u.bio||'No bio yet.'}</div>
+        {(u.interests||[]).length>0&&<>
+          <div style={{fontSize:'.7rem',fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em',color:'var(--muted)',marginBottom:'.4rem'}}>Interests</div>
+          <div style={{display:'flex',gap:'.3rem',flexWrap:'wrap',marginBottom:'1rem'}}>
+            {u.interests.map(i=><span key={i} className="tag tag-blue">{i}</span>)}
+          </div>
+        </>}
+        <button className="btn btn-outline" style={{width:'100%'}} onClick={onClose}>Close</button>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════
+   APP SHELL
+══════════════════════════════ */
+function AppShell({user,trips,users,onLogout,onUpdate,onJoin,onCreateTrip,onUpdateTrip}){
+  const [page,setPage]=useState('dashboard');
+  const [openTripId,setOpenTripId]=useState(null);
+  const [viewUid,setViewUid]=useState(null);
+  const [toast,setToast]=useState(null);
+
+  const showToast=m=>{setToast(null);setTimeout(()=>setToast(m),10);};
+
+  const joinTrip=tid=>{
+    onJoin(tid,user.id);
+    showToast('🎉 You joined the trip! Open the group chat below.');
+    setOpenTripId(tid);
+    setPage('chat');
+  };
+  const openTrip=tid=>{setOpenTripId(tid);setPage('chat');};
+
+  const myTrips=trips.filter(t=>t.memberIds.includes(user.id));
+  const openTripObj=trips.find(t=>t.id===openTripId);
+
+  const navItems=[
+    {id:'dashboard',ico:'🏠',lbl:'Dashboard'},
+    {id:'explore',ico:'🌍',lbl:'Explore Trips'},
+    {id:'create',ico:'✈️',lbl:'Create Trip'},
+    {id:'profile',ico:'👤',lbl:'My Profile'},
+  ];
+
+  const titles={dashboard:'Dashboard',explore:'Explore Trips',create:'Create Trip',profile:'My Profile',chat:openTripObj?`${openTripObj.emoji} ${openTripObj.title}`:'Trip Chat'};
+
+  return(
+    <div className="shell">
+      <div className="sidebar">
+        <Logo/>
+        <div className="sb-sec">
+          <div className="sb-lbl">Menu</div>
+          {navItems.map(n=>(
+            <div key={n.id} className={`nav-item ${page===n.id?'on':''}`} onClick={()=>setPage(n.id)}>
+              <span className="ni">{n.ico}</span>{n.lbl}
+            </div>
+          ))}
+        </div>
+        {myTrips.length>0&&(
+          <div className="sb-sec">
+            <div className="sb-lbl">My Trips</div>
+            {myTrips.map(t=>(
+              <div key={t.id} className={`nav-item ${page==='chat'&&openTripId===t.id?'on':''}`} onClick={()=>openTrip(t.id)} title={t.title}>
+                <span className="ni">{t.emoji}</span>
+                <span style={{fontSize:'.8rem',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{t.title}</span>
+              </div>
+            ))}
+          </div>
+        )}
+        <div className="sb-footer">
+          <div className="user-pill" onClick={()=>setPage('profile')}>
+            <Av name={user.name} size="sm"/>
+            <div style={{flex:1,minWidth:0}}>
+              <div className="up-name">{user.name}</div>
+              <div className="up-role">Traveler ✈️</div>
+            </div>
+            <span style={{fontSize:'.7rem',color:'var(--muted)'}}>→</span>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div className="topbar">
+          <h1>{titles[page]||''}</h1>
+          <div className="topbar-r">
+            <button className="btn btn-primary btn-sm" onClick={()=>setPage('create')}>+ New Trip</button>
+            <Av name={user.name} size="sm" onClick={()=>setPage('profile')}/>
+          </div>
+        </div>
+        <div className="main">
+          {page==='dashboard'&&<Dashboard user={user} trips={trips} users={users} onJoin={joinTrip} onOpen={openTrip} setPage={setPage}/>}
+          {page==='explore'&&<ExplorePage trips={trips} user={user} users={users} onJoin={joinTrip} onOpen={openTrip}/>}
+          {page==='create'&&<CreatePage user={user} onCreate={t=>{onCreateTrip(t);showToast('🚀 Trip created! Others can now find and join it.');}} setPage={setPage}/>}
+          {page==='profile'&&<ProfilePage user={user} onUpdate={onUpdate} onLogout={onLogout} showToast={showToast}/>}
+          {page==='chat'&&openTripObj&&(
+            <ChatPage trip={openTripObj} user={user} users={users} allTrips={trips} onBack={()=>setPage('dashboard')} onViewUser={id=>setViewUid(id)} onUpdateTrip={onUpdateTrip}/>
+          )}
+        </div>
+      </div>
+
+      {viewUid&&<UserModal uid_={viewUid} users={users} onClose={()=>setViewUid(null)}/>}
+      {toast&&<Toast msg={toast} onDone={()=>setToast(null)}/>}
+    </div>
+  );
+}
+
+/* ══════════════════════════════
+   ROOT APP — LOCALSTORAGE BACKED
+══════════════════════════════ */
+function App(){
+  const [users,setUsers]=useState(()=>LS.get('tb_users',[]));
+  const [trips,setTrips]=useState(()=>LS.get('tb_trips',[]));
+  const [me,setMe]=useState(()=>{
+    const saved=LS.get('tb_session',null);
+    if(!saved)return null;
+    const all=LS.get('tb_users',[]);
+    return all.find(u=>u.id===saved)||null;
+  });
+
+  useEffect(()=>LS.set('tb_users',users),[users]);
+  useEffect(()=>LS.set('tb_trips',trips),[trips]);
+  useEffect(()=>LS.set('tb_session',me?.id||null),[me]);
+
+  const login=u=>{setMe(u);};
+  const logout=()=>{setMe(null);LS.set('tb_session',null);};
+
+  const updateUser=u=>{
+    const updated=users.map(x=>x.id===u.id?u:x);
+    setUsers(updated);
+    setMe(u);
+  };
+
+  const joinTrip=(tid,uid)=>{
+    setTrips(ts=>ts.map(t=>{
+      if(t.id!==tid||t.memberIds.includes(uid))return t;
+      return {...t,memberIds:[...t.memberIds,uid],seats:Math.max(0,t.seats-1)};
+    }));
+  };
+
+  const createTrip=t=>{
+    setTrips(ts=>[...ts,t]);
+  };
+
+  const updateTrip=t=>{
+    setTrips(ts=>ts.map(x=>x.id===t.id?t:x));
+  };
+
+  if(!me) return <AuthScreen onLogin={login} users={users} setUsers={setUsers}/>;
+
+  const freshMe=users.find(u=>u.id===me.id)||me;
+
+  return(
+    <AppShell
+      user={freshMe}
+      trips={trips}
+      users={users}
+      onLogout={logout}
+      onUpdate={updateUser}
+      onJoin={joinTrip}
+      onCreateTrip={createTrip}
+      onUpdateTrip={updateTrip}
+    />
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
 </body>
 </html>
