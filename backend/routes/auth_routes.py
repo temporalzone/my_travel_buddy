@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 import bcrypt
 import uuid
 from database import get_db
-from helpers import create_token, now
+from helpers import create_token, now, send_reset_email, create_reset_token, verify_reset_token
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -109,15 +109,69 @@ def login():
 
 @auth_bp.route("/forgot-password", methods=["POST"])
 def forgot_password():
+    """
+    POST /api/auth/forgot-password
+    Body: { email }
+    Real email bhejta hai SendGrid se!
+    """
     data = request.get_json()
+
+    if not data.get("email"):
+        return jsonify({"error": "Email is required"}), 400
+
     conn = get_db()
     user = conn.execute(
-        "SELECT id FROM users WHERE email = ?",
-        (data.get("email", "").lower(),)
+        "SELECT * FROM users WHERE email = ?",
+        (data["email"].lower().strip(),)
     ).fetchone()
     conn.close()
 
     if not user:
-        return jsonify({"error": "No account found with that email"}), 404
+        return jsonify({"error": "No account found with this email"}), 404
 
-    return jsonify({"message": "Reset link sent to your email!"}), 200
+    # Reset token banao
+    reset_token = create_reset_token(data["email"].lower().strip())
+
+    # Email bhejo SendGrid se
+    sent = send_reset_email(data["email"].lower().strip(), reset_token)
+
+    if not sent:
+        return jsonify({"error": "Could not send email. Try again later."}), 500
+
+    return jsonify({"message": "Password reset link sent to your email!"}), 200
+
+
+@auth_bp.route("/reset-password", methods=["POST"])
+def reset_password():
+    """
+    POST /api/auth/reset-password
+    Body: { token, new_password }
+    """
+    data = request.get_json()
+
+    if not data.get("token") or not data.get("new_password"):
+        return jsonify({"error": "Token and new password are required"}), 400
+
+    if len(data["new_password"]) < 6:
+        return jsonify({"error": "Password must be at least 6 characters"}), 400
+
+    # Token verify karo
+    email = verify_reset_token(data["token"])
+    if not email:
+        return jsonify({"error": "Invalid or expired reset link"}), 400
+
+    # Naya password hash karo
+    new_hash = bcrypt.hashpw(
+        data["new_password"].encode("utf-8"),
+        bcrypt.gensalt()
+    ).decode("utf-8")
+
+    conn = get_db()
+    conn.execute(
+        "UPDATE users SET password = ? WHERE email = ?",
+        (new_hash, email)
+    )
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "Password reset successfully!"}), 200
