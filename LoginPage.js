@@ -27,10 +27,11 @@ function LoginPage({ onLogin, onGoRegister }) {
   const handleForgot = async () => {
     setErr(""); setOk("");
     if (!email) { setErr("Enter your email address."); return; }
+    
     const res = await API.forgotPassword(email);
     if (res.error) { setErr(res.error); return; }
     setOk(res.message);
-  };
+};
 
   return (
     <div style={{ minHeight: "100vh", display: "grid", gridTemplateColumns: "1fr 1fr" }}>
