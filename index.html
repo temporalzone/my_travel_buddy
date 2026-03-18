@@ -331,7 +331,7 @@ function AuthScreen({onLogin,users,setUsers}){
     if(!f.email){setErr('Enter your registered email.');return;}
     const u=users.find(x=>x.email.toLowerCase()===f.email.toLowerCase());
     if(!u){setErr('No account found with that email.');return;}
-    setOk(`A reset link has been sent to ${f.email}. (Demo: your password is "${u.password}")`);
+    setOk(`A reset link has been sent to ${f.email}!`);
   };
 
   return(
