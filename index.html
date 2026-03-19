@@ -326,13 +326,22 @@ function AuthScreen({onLogin,users,setUsers}){
     LS.set('tb_users',updated);
     onLogin(nu);
   };
-  const forgot=()=>{
-    setErr('');setOk('');
-    if(!f.email){setErr('Enter your registered email.');return;}
-    const u=users.find(x=>x.email.toLowerCase()===f.email.toLowerCase());
-    if(!u){setErr('No account found with that email.');return;}
-    setOk(`A reset link has been sent to ${f.email}. (Demo: your password is "${u.password}")`);
-  };
+const forgot = async () => {
+    setErr(''); setOk('');
+    if (!f.email) { setErr('Enter your email address.'); return; }
+    
+    const res = await fetch(
+        'https://my-travel-buddy-kn22.onrender.com/api/auth/forgot-password',
+        {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: f.email })
+        }
+    );
+    const data = await res.json();
+    if (data.error) { setErr(data.error); return; }
+    setOk(data.message);
+};
 
   return(
     <div className="auth-wrap">
