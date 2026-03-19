@@ -109,11 +109,6 @@ def login():
 
 @auth_bp.route("/forgot-password", methods=["POST"])
 def forgot_password():
-    """
-    POST /api/auth/forgot-password
-    Body: { email }
-    Real email bhejta hai SendGrid se!
-    """
     data = request.get_json()
 
     if not data.get("email"):
@@ -126,17 +121,14 @@ def forgot_password():
     ).fetchone()
     conn.close()
 
-print(f"Looking for email: {data['email'].lower().strip()}")
-all_users = get_db().execute("SELECT email FROM users").fetchall()
-print(f"All users in DB: {[u['email'] for u in all_users]}")
+    print(f"Looking for email: {data['email'].lower().strip()}")
+    all_users = get_db().execute("SELECT email FROM users").fetchall()
+    print(f"All users in DB: {[u['email'] for u in all_users]}")
 
-if not user:
-    return jsonify({"error": "No account found with this email"}), 404
+    if not user:
+        return jsonify({"error": "No account found with this email"}), 404
 
-    # Reset token banao
     reset_token = create_reset_token(data["email"].lower().strip())
-
-    # Email bhejo SendGrid se
     sent = send_reset_email(data["email"].lower().strip(), reset_token)
 
     if not sent:
