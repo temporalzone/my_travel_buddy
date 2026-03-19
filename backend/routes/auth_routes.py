@@ -126,8 +126,12 @@ def forgot_password():
     ).fetchone()
     conn.close()
 
-    if not user:
-        return jsonify({"error": "No account found with this email"}), 404
+print(f"Looking for email: {data['email'].lower().strip()}")
+all_users = get_db().execute("SELECT email FROM users").fetchall()
+print(f"All users in DB: {[u['email'] for u in all_users]}")
+
+if not user:
+    return jsonify({"error": "No account found with this email"}), 404
 
     # Reset token banao
     reset_token = create_reset_token(data["email"].lower().strip())
