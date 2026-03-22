@@ -79,16 +79,23 @@ function App() {
   };
 
   // ── If not logged in, show auth screens ──
-  if (!user) {
-    return (
-      <>
-        {authView === "login"
-          ? <LoginPage    onLogin={handleLogin}   onGoRegister={() => setAuthView("register")} />
-          : <RegisterPage onLogin={handleLogin}   onGoLogin={()    => setAuthView("login")} />
-        }
-      </>
-    );
+if (!user) {
+  // Check if we're on reset-password page
+  const resetToken = new URLSearchParams(window.location.search).get("reset_token");
+  
+  if (resetToken) {
+    return <ResetPasswordPage resetToken={resetToken} onResetComplete={() => setAuthView("login")} />;
   }
+
+  return (
+    <>
+      {authView === "login"
+        ? <LoginPage    onLogin={handleLogin}   onGoRegister={() => setAuthView("register")} />
+        : <RegisterPage onLogin={handleLogin}   onGoLogin={()    => setAuthView("login")} />
+      }
+    </>
+  );
+}
 
   const openTripObj = trips.find(t => t.id === openTripId);
   const myTrips     = trips.filter(t => (t.memberIds || []).includes(user.id));
