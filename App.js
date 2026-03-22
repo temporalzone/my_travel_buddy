@@ -78,9 +78,9 @@ function App() {
     setPage("dashboard");
   };
 
-  // ── If not logged in, show auth screens ──
+// ── If not logged in, show auth screens ──
 if (!user) {
-  // Check if we're on reset-password page
+  // Check if we have a reset token in the URL
   const resetToken = new URLSearchParams(window.location.search).get("reset_token");
   
   if (resetToken) {
