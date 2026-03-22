@@ -34,14 +34,16 @@ const API = {
     return res.json();
   },
 
-  forgotPassword: async (email) => {
-    const res = await fetch(`${BASE_URL}/api/auth/forgot-password`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email })
-    });
-    return res.json();
-  },
+  const BASE_URL = "https://my-travel-buddy-kn22.onrender.com/";  // Your actual Render URL
+
+forgotPassword: async (email) => {
+  const res = await fetch(`${BASE_URL}/api/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email })
+  });
+  return res.json();
+}
 
   // ── USERS ────────────────────────────────────────────────
   getMe: async () => {
