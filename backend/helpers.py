@@ -82,9 +82,12 @@ def send_reset_email(to_email, reset_token):
     )
 
     try:
-        sg = SendGridAPIClient(SENDGRID_API_KEY)
-        sg.send(message)
-        return True
-    except Exception as e:
-        print(f"Email error: {e}")
-        return False
+    sg = SendGridAPIClient(SENDGRID_API_KEY)
+    response = sg.send(message)
+    print(f"Email sent! Status: {response.status_code}")
+    return True
+except Exception as e:
+    print(f"Email error details: {str(e)}")
+    print(f"API Key exists: {bool(SENDGRID_API_KEY)}")
+    print(f"From email: {FROM_EMAIL}")
+    return False
