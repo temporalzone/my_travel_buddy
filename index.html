@@ -298,6 +298,34 @@ function Toast({msg,onDone}){
   return <div className="toast">{msg}</div>;
 }
 
+function optimizeAvatarFile(file,maxDim=512,quality=0.82){
+  return new Promise((resolve,reject)=>{
+    const reader=new FileReader();
+    reader.onerror=()=>reject(new Error('Could not read image file.'));
+    reader.onload=()=>{
+      const img=new Image();
+      img.onerror=()=>reject(new Error('Invalid image file.'));
+      img.onload=()=>{
+        const side=Math.min(img.width,img.height);
+        const sx=Math.floor((img.width-side)/2);
+        const sy=Math.floor((img.height-side)/2);
+        const out=Math.min(maxDim,side);
+
+        const canvas=document.createElement('canvas');
+        canvas.width=out;
+        canvas.height=out;
+        const ctx=canvas.getContext('2d');
+        ctx.drawImage(img,sx,sy,side,side,0,0,out,out);
+
+        const outType=file.type==='image/png'?'image/png':'image/jpeg';
+        resolve(canvas.toDataURL(outType,outType==='image/jpeg'?quality:undefined));
+      };
+      img.src=reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 /* ══════════════════════════════
    AUTH
 ══════════════════════════════ */
@@ -314,13 +342,17 @@ function AuthScreen({onLogin,users,setUsers}){
   const resetToken = new URLSearchParams(window.location.search).get('reset_token');
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
 
-  const handleRegisterPhoto = (file) => {
+  const handleRegisterPhoto = async (file) => {
     if(!file) return;
     if(!file.type.startsWith('image/')){setErr('Please select an image file.');return;}
     if(file.size>2*1024*1024){setErr('Profile picture should be under 2MB.');return;}
-    const reader=new FileReader();
-    reader.onload=()=>s('photo',reader.result||'');
-    reader.readAsDataURL(file);
+    try{
+      const optimized=await optimizeAvatarFile(file,512,0.84);
+      s('photo',optimized||'');
+      setErr('');
+    }catch(_){
+      setErr('Could not process image. Please try another PNG/JPG file.');
+    }
   };
 
   useEffect(()=>{
@@ -899,13 +931,16 @@ function ProfilePage({user,onUpdate,onLogout,showToast}){
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   const sp=(k,v)=>setPw(p=>({...p,[k]:v}));
 
-  const handleProfilePhoto = (file) => {
+  const handleProfilePhoto = async (file) => {
     if(!file) return;
     if(!file.type.startsWith('image/')){showToast('Please select an image file.');return;}
     if(file.size>2*1024*1024){showToast('Profile picture should be under 2MB.');return;}
-    const reader=new FileReader();
-    reader.onload=()=>s('photo',reader.result||'');
-    reader.readAsDataURL(file);
+    try{
+      const optimized=await optimizeAvatarFile(file,512,0.84);
+      s('photo',optimized||'');
+    }catch(_){
+      showToast('Could not process image. Please try another PNG/JPG file.');
+    }
   };
 
   const save=()=>{
