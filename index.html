@@ -338,14 +338,42 @@ function AuthScreen({onLogin,users,setUsers}){
   const forgot=async()=>{
     setErr('');setOk('');
     if(!f.email){setErr('Enter your email address.');return;}
-    const res=await fetch('https://my-travel-buddy-kn22.onrender.com/api/auth/forgot-password',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({email:f.email})
-    });
-    const data=await res.json();
-    if(data.error){setErr(data.error);return;}
-    setOk(data.message);
+    const payload={email:f.email.trim()};
+    const urls=[
+      'https://my-travel-buddy-kn22.onrender.com/api/auth/forgot-password',
+      'https://my-travel-buddy-kn22.onrender.com/api/auth/forgot_password'
+    ];
+
+    let lastError='Could not send email. Try again later.';
+
+    for(const url of urls){
+      try{
+        const res=await fetch(url,{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify(payload)
+        });
+
+        let data={};
+        const text=await res.text();
+        try{data=text?JSON.parse(text):{};}catch(_){data={};}
+
+        if(res.ok){
+          setOk(data.message||'If that email exists, reset link was sent.');
+          return;
+        }
+
+        // If the route is missing, try the next URL variant.
+        if(res.status===404) continue;
+
+        lastError=data.error||`Request failed (${res.status})`;
+        break;
+      }catch(e){
+        lastError='Network error. Check your internet connection and try again.';
+      }
+    }
+
+    setErr(lastError);
   };
 
   return(
