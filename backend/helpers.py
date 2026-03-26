@@ -66,12 +66,13 @@ def send_reset_email(to_email, reset_token):
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
 
-    # Build reset link safely (avoid accidental double /my_travel_buddy)
+    # Build reset link for GitHub Pages app shell.
+    # The frontend reads `reset_token` from query params on the app root.
     base_url = (FRONTEND_URL or "").rstrip("/")
     if base_url.endswith("/my_travel_buddy"):
-        reset_link = f"{base_url}/reset-password?token={reset_token}"
+        reset_link = f"{base_url}/?reset_token={reset_token}"
     else:
-        reset_link = f"{base_url}/my_travel_buddy/reset-password?token={reset_token}"
+        reset_link = f"{base_url}/my_travel_buddy/?reset_token={reset_token}"
 
     html = f"""
     <div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:2rem;">

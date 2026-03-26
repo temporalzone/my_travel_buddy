@@ -136,11 +136,12 @@ def forgot_password():
         print(f"forgot-password send failure: {send_message}")
 
         # Temporary fallback for environments where outbound mail is blocked.
+        # Must point to app root + reset_token query for GitHub Pages.
         base_url = (FRONTEND_URL or "").rstrip("/")
         if base_url.endswith("/my_travel_buddy"):
-            reset_link = f"{base_url}/reset-password?token={reset_token}"
+            reset_link = f"{base_url}/?reset_token={reset_token}"
         else:
-            reset_link = f"{base_url}/my_travel_buddy/reset-password?token={reset_token}"
+            reset_link = f"{base_url}/my_travel_buddy/?reset_token={reset_token}"
 
         return jsonify({
             "message": "Email delivery failed, but you can still reset using this link.",
