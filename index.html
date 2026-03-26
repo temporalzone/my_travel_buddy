@@ -366,7 +366,7 @@ function AuthScreen({onLogin,users,setUsers}){
         // If the route is missing, try the next URL variant.
         if(res.status===404) continue;
 
-        lastError=data.error||`Request failed (${res.status})`;
+        lastError=data.details?`${data.error} (${data.details})`:(data.error||`Request failed (${res.status})`);
         break;
       }catch(e){
         lastError='Network error. Check your internet connection and try again.';
