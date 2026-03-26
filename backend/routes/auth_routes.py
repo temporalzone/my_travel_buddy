@@ -108,6 +108,7 @@ def login():
 
 
 @auth_bp.route("/forgot-password", methods=["POST"])
+@auth_bp.route("/forgot_password", methods=["POST"])
 def forgot_password():
     data = request.get_json()
 

@@ -14,6 +14,12 @@ app.register_blueprint(trip_bp,    url_prefix="/api/trips")
 app.register_blueprint(user_bp,    url_prefix="/api/users")
 app.register_blueprint(message_bp, url_prefix="/api/messages")
 
+# Print registered routes on startup for deployment diagnostics.
+for rule in sorted(app.url_map.iter_rules(), key=lambda r: r.rule):
+    if rule.endpoint != "static":
+        methods = ",".join(sorted(m for m in rule.methods if m in {"GET", "POST", "PUT", "DELETE", "OPTIONS"}))
+        print(f"ROUTE {rule.rule} [{methods}]")
+
 if __name__ == "__main__":
     init_db()
     print("🌍 Travel Buddy backend running at http://localhost:5000")
