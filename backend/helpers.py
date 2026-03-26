@@ -57,7 +57,11 @@ def now():
     return datetime.datetime.utcnow().isoformat()
 
 def send_reset_email(to_email, reset_token):
-    """Send password reset email via SendGrid or Gmail fallback"""
+    """Send password reset email via SendGrid or Gmail fallback.
+
+    Returns:
+        (success: bool, message: str)
+    """
     import smtplib
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
@@ -99,16 +103,19 @@ def send_reset_email(to_email, reset_token):
             status = getattr(response, "status_code", None)
             if status in (200, 202):
                 print(f"Email sent via SendGrid to {to_email} (status={status})")
-                return True
+                return True, "Email sent via SendGrid"
 
             body = getattr(response, "body", b"")
             if isinstance(body, bytes):
                 body = body.decode("utf-8", errors="ignore")
             print(f"SendGrid failed with status={status}, body={body}")
+            sendgrid_error = f"SendGrid status={status} body={body}"
         else:
             print("SendGrid skipped: SENDGRID_API_KEY or SENDGRID_FROM_EMAIL missing")
+            sendgrid_error = "SendGrid skipped: missing SENDGRID_API_KEY or SENDGRID_FROM_EMAIL"
     except Exception as e:
         print(f"SendGrid exception: {str(e)}")
+        sendgrid_error = f"SendGrid exception: {str(e)}"
 
     # Fallback to Gmail SMTP
     GMAIL = os.getenv("GMAIL_USER")
@@ -116,7 +123,7 @@ def send_reset_email(to_email, reset_token):
 
     if not GMAIL or not GMAIL_PASS:
         print("No fallback email credentials (GMAIL_USER/GMAIL_APP_PASSWORD missing)")
-        return False
+        return False, f"{sendgrid_error}; Gmail fallback missing credentials"
 
     msg = MIMEMultipart('alternative')
     msg['Subject'] = "Travel Buddy — Reset Your Password"
@@ -131,9 +138,10 @@ def send_reset_email(to_email, reset_token):
         server.sendmail(GMAIL, to_email, msg.as_string())
         server.quit()
         print(f"Email sent via Gmail SSL to {to_email}")
-        return True
+        return True, "Email sent via Gmail SSL"
     except Exception as e:
         print(f"Gmail SSL error: {str(e)}")
+        gmail_ssl_error = str(e)
 
     # Fallback attempt 2: STARTTLS (port 587)
     try:
@@ -145,7 +153,7 @@ def send_reset_email(to_email, reset_token):
         server.sendmail(GMAIL, to_email, msg.as_string())
         server.quit()
         print(f"Email sent via Gmail STARTTLS to {to_email}")
-        return True
+        return True, "Email sent via Gmail STARTTLS"
     except Exception as e:
         print(f"Gmail STARTTLS error: {str(e)}")
-        return False
+        return False, f"{sendgrid_error}; Gmail SSL error: {gmail_ssl_error}; Gmail STARTTLS error: {str(e)}"

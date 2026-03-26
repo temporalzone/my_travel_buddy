@@ -130,10 +130,11 @@ def forgot_password():
         return jsonify({"error": "No account found with this email"}), 404
 
     reset_token = create_reset_token(data["email"].lower().strip())
-    sent = send_reset_email(data["email"].lower().strip(), reset_token)
+    sent, send_message = send_reset_email(data["email"].lower().strip(), reset_token)
 
     if not sent:
-        return jsonify({"error": "Could not send email. Try again later."}), 500
+        print(f"forgot-password send failure: {send_message}")
+        return jsonify({"error": "Could not send email. Try again later.", "details": send_message}), 500
 
     return jsonify({"message": "Password reset link sent to your email!"}), 200
 
