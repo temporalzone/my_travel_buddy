@@ -1,5 +1,6 @@
 from flask import Flask
 from flask_cors import CORS
+import os
 from database import init_db
 from routes.auth_routes import auth_bp
 from routes.trip_routes import trip_bp
@@ -22,5 +23,6 @@ for rule in sorted(app.url_map.iter_rules(), key=lambda r: r.rule):
 
 if __name__ == "__main__":
     init_db()
-    print("🌍 Travel Buddy backend running at http://localhost:5000")
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    port = int(os.getenv("PORT", "5000"))
+    print(f"🌍 Travel Buddy backend running on port {port}")
+    app.run(host="0.0.0.0", port=port, debug=False)
