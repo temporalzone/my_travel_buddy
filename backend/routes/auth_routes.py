@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 import bcrypt
 import uuid
 from database import get_db
-from helpers import create_token, now, send_reset_email, create_reset_token, verify_reset_token
+from helpers import create_token, now, send_reset_email, create_reset_token, verify_reset_token, FRONTEND_URL
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -134,7 +134,19 @@ def forgot_password():
 
     if not sent:
         print(f"forgot-password send failure: {send_message}")
-        return jsonify({"error": "Could not send email. Try again later.", "details": send_message}), 500
+
+        # Temporary fallback for environments where outbound mail is blocked.
+        base_url = (FRONTEND_URL or "").rstrip("/")
+        if base_url.endswith("/my_travel_buddy"):
+            reset_link = f"{base_url}/reset-password?token={reset_token}"
+        else:
+            reset_link = f"{base_url}/my_travel_buddy/reset-password?token={reset_token}"
+
+        return jsonify({
+            "message": "Email delivery failed, but you can still reset using this link.",
+            "reset_link": reset_link,
+            "details": send_message
+        }), 200
 
     return jsonify({"message": "Password reset link sent to your email!"}), 200
 

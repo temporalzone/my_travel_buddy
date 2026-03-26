@@ -359,7 +359,8 @@ function AuthScreen({onLogin,users,setUsers}){
         try{data=text?JSON.parse(text):{};}catch(_){data={};}
 
         if(res.ok){
-          setOk(data.message||'If that email exists, reset link was sent.');
+          const msg = data.reset_link ? `${data.message} ${data.reset_link}` : (data.message||'If that email exists, reset link was sent.');
+          setOk(msg);
           return;
         }
 
