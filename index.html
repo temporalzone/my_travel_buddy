@@ -284,8 +284,11 @@ function Logo({size=1}){
 }
 
 /* ── AVATAR ── */
-function Av({name,size='md',onClick}){
+function Av({name,size='md',onClick,imageUrl}){
   const cls={xs:'av-xs',sm:'av-sm',md:'av-md',lg:'av-lg',xl:'av-xl'}[size]||'av-md';
+  if(imageUrl){
+    return <img src={imageUrl} alt={name||'User'} className={`av ${cls}`} style={{cursor:onClick?'pointer':'default',flexShrink:0,objectFit:'cover'}} onClick={onClick}/>;
+  }
   return <div className={`av ${cls}`} style={{background:aColor(name||'?'),cursor:onClick?'pointer':'default',flexShrink:0}} onClick={onClick}>{(name||'?')[0].toUpperCase()}</div>;
 }
 
@@ -311,6 +314,15 @@ function AuthScreen({onLogin,users,setUsers}){
   const resetToken = new URLSearchParams(window.location.search).get('reset_token');
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
 
+  const handleRegisterPhoto = (file) => {
+    if(!file) return;
+    if(!file.type.startsWith('image/')){setErr('Please select an image file.');return;}
+    if(file.size>2*1024*1024){setErr('Profile picture should be under 2MB.');return;}
+    const reader=new FileReader();
+    reader.onload=()=>s('photo',reader.result||'');
+    reader.readAsDataURL(file);
+  };
+
   useEffect(()=>{
     if(resetToken){
       setView('reset');
@@ -334,12 +346,13 @@ function AuthScreen({onLogin,users,setUsers}){
   };
   const register=async()=>{
     setErr('');
-    if(!f.name||!f.email||!f.pw||!f.pw2){setErr('Please fill all required fields.');return;}
+    if(!f.name||!f.email||!f.pw||!f.pw2||!f.loc||!f.bio||!f.age||!f.gender||!f.photo){setErr('Please fill all required fields.');return;}
     if(!f.email.includes('@')||!f.email.includes('.')){setErr('Enter a valid email address.');return;}
     if(f.pw.length<6){setErr('Password must be at least 6 characters.');return;}
     if(f.pw!==f.pw2){setErr('Passwords do not match.');return;}
     const ageNum=f.age?parseInt(f.age,10):null;
-    if(f.age && (isNaN(ageNum) || ageNum<13 || ageNum>100)){setErr('Age should be between 13 and 100.');return;}
+    if(isNaN(ageNum) || ageNum<13 || ageNum>100){setErr('Age should be between 13 and 100.');return;}
+    if(!String(f.photo).startsWith('data:image/')){setErr('Please upload a valid profile image from your device.');return;}
     const res=await fetch('https://my-travel-buddy-kn22.onrender.com/api/auth/request-register-otp',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -347,11 +360,11 @@ function AuthScreen({onLogin,users,setUsers}){
         name:f.name.trim(),
         email:f.email.trim(),
         password:f.pw,
-        location:f.loc.trim()||'Earth 🌍',
-        bio:f.bio.trim()||'New traveler ready to explore!',
+        location:f.loc.trim(),
+        bio:f.bio.trim(),
         age:ageNum,
         gender:f.gender,
-        profile_picture:f.photo.trim()||null
+        profile_picture:f.photo
       })
     });
     const data=await res.json();
@@ -532,14 +545,14 @@ function AuthScreen({onLogin,users,setUsers}){
               <div className="field"><label>Password *</label><div className="field-wrap"><span className="ico">🔒</span><input type="password" placeholder="Min. 6 characters" value={f.pw} onChange={e=>s('pw',e.target.value)}/></div></div>
               {tab==='register'&&<>
                 <div className="field"><label>Confirm Password *</label><div className="field-wrap"><span className="ico">🔒</span><input type="password" placeholder="Repeat your password" value={f.pw2} onChange={e=>s('pw2',e.target.value)}/></div></div>
-                <div className="divider">optional details</div>
+                <div className="divider">required details</div>
                 <div className="field-row">
-                  <div className="field"><label>Age</label><div className="field-wrap"><span className="ico">🎂</span><input type="number" min="13" max="100" placeholder="e.g. 24" value={f.age} onChange={e=>s('age',e.target.value)}/></div></div>
-                  <div className="field"><label>Gender</label><select value={f.gender} onChange={e=>s('gender',e.target.value)}><option>Prefer not to say</option><option>Male</option><option>Female</option><option>Non-binary</option><option>Other</option></select></div>
+                  <div className="field"><label>Age *</label><div className="field-wrap"><span className="ico">🎂</span><input type="number" min="13" max="100" placeholder="e.g. 24" value={f.age} onChange={e=>s('age',e.target.value)}/></div></div>
+                  <div className="field"><label>Gender *</label><select value={f.gender} onChange={e=>s('gender',e.target.value)}><option>Prefer not to say</option><option>Male</option><option>Female</option><option>Non-binary</option><option>Other</option></select></div>
                 </div>
-                <div className="field"><label>Location</label><div className="field-wrap"><span className="ico">📍</span><input placeholder="City, Country" value={f.loc} onChange={e=>s('loc',e.target.value)}/></div></div>
-                <div className="field"><label>Profile Picture URL</label><div className="field-wrap"><span className="ico">🖼️</span><input placeholder="https://..." value={f.photo} onChange={e=>s('photo',e.target.value)}/></div></div>
-                <div className="field"><label>Bio</label><textarea className="field" placeholder="Tell fellow travelers about yourself..." value={f.bio} onChange={e=>s('bio',e.target.value)} style={{padding:'.65rem .95rem',border:'1.5px solid var(--border)',borderRadius:10,fontFamily:'Nunito,sans-serif',fontSize:'.9rem',width:'100%',outline:'none',resize:'vertical',minHeight:76}}/></div>
+                <div className="field"><label>Location *</label><div className="field-wrap"><span className="ico">📍</span><input placeholder="City, Country" value={f.loc} onChange={e=>s('loc',e.target.value)}/></div></div>
+                <div className="field"><label>Profile Picture (PNG/JPG) *</label><div className="field-wrap"><span className="ico">🖼️</span><input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" onChange={e=>handleRegisterPhoto(e.target.files?.[0])}/></div>{f.photo&&<img src={f.photo} alt="preview" style={{width:58,height:58,borderRadius:10,objectFit:'cover',marginTop:'.45rem'}}/>}</div>
+                <div className="field"><label>Bio *</label><textarea className="field" placeholder="Tell fellow travelers about yourself..." value={f.bio} onChange={e=>s('bio',e.target.value)} style={{padding:'.65rem .95rem',border:'1.5px solid var(--border)',borderRadius:10,fontFamily:'Nunito,sans-serif',fontSize:'.9rem',width:'100%',outline:'none',resize:'vertical',minHeight:76}}/></div>
               </>}
               {tab==='login'&&<div style={{textAlign:'right',marginBottom:'.85rem'}}><span className="auth-link" onClick={()=>{setView('forgot');setErr('');setOk('');}}>Forgot password?</span></div>}
               <button className="btn btn-primary" style={{width:'100%',padding:'.78rem'}} onClick={tab==='login'?login:register}>
@@ -886,12 +899,22 @@ function ProfilePage({user,onUpdate,onLogout,showToast}){
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
   const sp=(k,v)=>setPw(p=>({...p,[k]:v}));
 
+  const handleProfilePhoto = (file) => {
+    if(!file) return;
+    if(!file.type.startsWith('image/')){showToast('Please select an image file.');return;}
+    if(file.size>2*1024*1024){showToast('Profile picture should be under 2MB.');return;}
+    const reader=new FileReader();
+    reader.onload=()=>s('photo',reader.result||'');
+    reader.readAsDataURL(file);
+  };
+
   const save=()=>{
-    if(!f.name.trim()||!f.email.trim()){showToast('Name and email are required.');return;}
+    if(!f.name.trim()||!f.email.trim()||!f.loc.trim()||!f.bio.trim()||!f.age||!f.gender||!f.photo){showToast('All profile details are required.');return;}
     if(!f.email.includes('@')){showToast('Enter a valid email.');return;}
     const ageNum=f.age?parseInt(f.age,10):null;
-    if(f.age && (isNaN(ageNum)||ageNum<13||ageNum>100)){showToast('Age should be between 13 and 100.');return;}
-    onUpdate({...user,name:f.name.trim(),email:f.email.trim(),location:f.loc.trim(),bio:f.bio.trim(),interests:f.interests.split(',').map(i=>i.trim()).filter(Boolean),age:ageNum,gender:f.gender,profile_picture:f.photo.trim()||null});
+    if(isNaN(ageNum)||ageNum<13||ageNum>100){showToast('Age should be between 13 and 100.');return;}
+    if(!String(f.photo).startsWith('data:image/')){showToast('Upload profile image from your device.');return;}
+    onUpdate({...user,name:f.name.trim(),email:f.email.trim(),location:f.loc.trim(),bio:f.bio.trim(),interests:f.interests.split(',').map(i=>i.trim()).filter(Boolean),age:ageNum,gender:f.gender,profile_picture:f.photo});
     setEditing(false);
     showToast('✅ Profile updated!');
   };
@@ -912,7 +935,7 @@ function ProfilePage({user,onUpdate,onLogout,showToast}){
   return(
     <div className="prof-wrap fade-up">
       <div className="prof-hero">
-        <Av name={user.name} size="xl"/>
+        <Av name={user.name} size="xl" imageUrl={user.profile_picture}/>
         <div className="prof-hero-info">
           <h2>{user.name}</h2>
           <p>📧 {user.email}</p>
@@ -932,13 +955,13 @@ function ProfilePage({user,onUpdate,onLogout,showToast}){
           <>
             <div className="field"><label>Full Name *</label><div className="field-wrap"><span className="ico">👤</span><input value={f.name} onChange={e=>s('name',e.target.value)}/></div></div>
             <div className="field"><label>Email *</label><div className="field-wrap"><span className="ico">📧</span><input value={f.email} onChange={e=>s('email',e.target.value)}/></div></div>
-            <div className="field"><label>Location</label><div className="field-wrap"><span className="ico">📍</span><input value={f.loc} onChange={e=>s('loc',e.target.value)}/></div></div>
+            <div className="field"><label>Location *</label><div className="field-wrap"><span className="ico">📍</span><input value={f.loc} onChange={e=>s('loc',e.target.value)}/></div></div>
             <div className="field-row">
-              <div className="field"><label>Age</label><div className="field-wrap"><span className="ico">🎂</span><input type="number" min="13" max="100" value={f.age} onChange={e=>s('age',e.target.value)}/></div></div>
-              <div className="field"><label>Gender</label><select value={f.gender} onChange={e=>s('gender',e.target.value)}><option>Prefer not to say</option><option>Male</option><option>Female</option><option>Non-binary</option><option>Other</option></select></div>
+              <div className="field"><label>Age *</label><div className="field-wrap"><span className="ico">🎂</span><input type="number" min="13" max="100" value={f.age} onChange={e=>s('age',e.target.value)}/></div></div>
+              <div className="field"><label>Gender *</label><select value={f.gender} onChange={e=>s('gender',e.target.value)}><option>Prefer not to say</option><option>Male</option><option>Female</option><option>Non-binary</option><option>Other</option></select></div>
             </div>
-            <div className="field"><label>Profile Picture URL</label><div className="field-wrap"><span className="ico">🖼️</span><input value={f.photo} onChange={e=>s('photo',e.target.value)} placeholder="https://..."/></div></div>
-            <div className="field"><label>Bio</label><textarea style={{padding:'.65rem .95rem',border:'1.5px solid var(--border)',borderRadius:10,fontFamily:'Nunito,sans-serif',fontSize:'.88rem',width:'100%',outline:'none',resize:'vertical',minHeight:76}} value={f.bio} onChange={e=>s('bio',e.target.value)}/></div>
+            <div className="field"><label>Profile Picture (PNG/JPG) *</label><div className="field-wrap"><span className="ico">🖼️</span><input type="file" accept="image/png,image/jpeg,image/jpg,image/webp" onChange={e=>handleProfilePhoto(e.target.files?.[0])}/></div>{f.photo&&<img src={f.photo} alt="preview" style={{width:58,height:58,borderRadius:10,objectFit:'cover',marginTop:'.45rem'}}/>}</div>
+            <div className="field"><label>Bio *</label><textarea style={{padding:'.65rem .95rem',border:'1.5px solid var(--border)',borderRadius:10,fontFamily:'Nunito,sans-serif',fontSize:'.88rem',width:'100%',outline:'none',resize:'vertical',minHeight:76}} value={f.bio} onChange={e=>s('bio',e.target.value)}/></div>
             <div className="field"><label>Interests (comma separated)</label><div className="field-wrap"><span className="ico">🏷️</span><input placeholder="e.g. Hiking, Photography, Food" value={f.interests} onChange={e=>s('interests',e.target.value)}/></div></div>
             <div style={{display:'flex',gap:'.55rem'}}>
               <button className="btn btn-primary btn-sm" onClick={save}>Save Changes</button>

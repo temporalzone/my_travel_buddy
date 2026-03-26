@@ -30,14 +30,26 @@ def _build_user_response(user):
 def register():
     data = request.get_json()
 
-    if not data.get("name") or not data.get("email") or not data.get("password"):
-        return jsonify({"error": "Name, email and password are required"}), 400
+    required = ["name", "email", "password", "location", "bio", "age", "gender", "profile_picture"]
+    if any(not data.get(k) for k in required):
+        return jsonify({"error": "Name, email, password, location, bio, age, gender and profile picture are required"}), 400
 
     if "@" not in data["email"]:
         return jsonify({"error": "Enter a valid email address"}), 400
 
     if len(data["password"]) < 6:
         return jsonify({"error": "Password must be at least 6 characters"}), 400
+
+    try:
+        age_num = int(data.get("age"))
+    except Exception:
+        return jsonify({"error": "Age must be a valid number"}), 400
+
+    if age_num < 13 or age_num > 100:
+        return jsonify({"error": "Age should be between 13 and 100"}), 400
+
+    if not str(data.get("profile_picture", "")).startswith("data:image/"):
+        return jsonify({"error": "Profile picture must be uploaded image data"}), 400
 
     conn = get_db()
 
@@ -66,11 +78,11 @@ def register():
         data["name"].strip(),
         data["email"].lower().strip(),
         hashed,
-        data.get("location", "Earth 🌍"),
-        data.get("bio", "New traveler!"),
+        data.get("location", "").strip(),
+        data.get("bio", "").strip(),
         "",
         joined,
-        data.get("age"),
+        age_num,
         data.get("gender"),
         data.get("profile_picture")
     ))
@@ -98,8 +110,9 @@ def register():
 def request_register_otp():
     data = request.get_json()
 
-    if not data.get("name") or not data.get("email") or not data.get("password"):
-        return jsonify({"error": "Name, email and password are required"}), 400
+    required = ["name", "email", "password", "location", "bio", "age", "gender", "profile_picture"]
+    if any(not data.get(k) for k in required):
+        return jsonify({"error": "Name, email, password, location, bio, age, gender and profile picture are required"}), 400
 
     email = data["email"].lower().strip()
     if "@" not in email:
@@ -107,6 +120,18 @@ def request_register_otp():
 
     if len(data["password"]) < 6:
         return jsonify({"error": "Password must be at least 6 characters"}), 400
+
+    try:
+        age_num = int(data.get("age"))
+    except Exception:
+        return jsonify({"error": "Age must be a valid number"}), 400
+
+    if age_num < 13 or age_num > 100:
+        return jsonify({"error": "Age should be between 13 and 100"}), 400
+
+    profile_picture = str(data.get("profile_picture", ""))
+    if not profile_picture.startswith("data:image/"):
+        return jsonify({"error": "Profile picture must be uploaded image data"}), 400
 
     conn = get_db()
     existing = conn.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
@@ -120,11 +145,11 @@ def request_register_otp():
         "name": data.get("name", "").strip(),
         "email": email,
         "password": data.get("password"),
-        "location": data.get("location", "Earth 🌍"),
-        "bio": data.get("bio", "New traveler!"),
-        "age": data.get("age"),
+        "location": data.get("location", "").strip(),
+        "bio": data.get("bio", "").strip(),
+        "age": age_num,
         "gender": data.get("gender"),
-        "profile_picture": data.get("profile_picture")
+        "profile_picture": profile_picture
     })
     expires_at = (datetime.utcnow() + timedelta(minutes=10)).isoformat()
 

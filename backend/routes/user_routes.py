@@ -42,8 +42,20 @@ def update_profile():
 
     data = request.get_json()
 
-    if not data.get("name") or not data.get("email"):
-        return jsonify({"error": "Name and email are required"}), 400
+    required = ["name", "email", "location", "bio", "age", "gender", "profile_picture"]
+    if any(not data.get(k) for k in required):
+        return jsonify({"error": "Name, email, location, bio, age, gender and profile picture are required"}), 400
+
+    try:
+        age_num = int(data.get("age"))
+    except Exception:
+        return jsonify({"error": "Age must be a valid number"}), 400
+
+    if age_num < 13 or age_num > 100:
+        return jsonify({"error": "Age should be between 13 and 100"}), 400
+
+    if not str(data.get("profile_picture", "")).startswith("data:image/"):
+        return jsonify({"error": "Profile picture must be uploaded image data"}), 400
 
     conn = get_db()
     conn.execute("""
@@ -53,10 +65,10 @@ def update_profile():
     """, (
         data["name"].strip(),
         data["email"].lower().strip(),
-        data.get("location", ""),
-        data.get("bio", ""),
+        data.get("location", "").strip(),
+        data.get("bio", "").strip(),
         ",".join(data.get("interests", [])),
-        data.get("age"),
+        age_num,
         data.get("gender"),
         data.get("profile_picture"),
         user_id
