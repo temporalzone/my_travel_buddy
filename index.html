@@ -177,7 +177,7 @@ html,body{height:100%;font-family:'Nunito',sans-serif;background:var(--surface);
 .chat-msgs{flex:1;overflow-y:auto;padding:.85rem;display:flex;flex-direction:column;gap:.6rem;}
 .msg{display:flex;gap:.5rem;align-items:flex-end;}
 .msg.mine{flex-direction:row-reverse;}
-.bubble{max-width:72%;padding:.58rem .9rem;border-radius:16px;font-size:.84rem;line-height:1.5;word-break:break-word;}
+.bubble{max-width:72%;min-width:3.2rem;padding:.58rem .9rem;border-radius:16px;font-size:.84rem;line-height:1.5;white-space:pre-wrap;word-break:normal;overflow-wrap:anywhere;}
 .msg.theirs .bubble{background:var(--surface);border-bottom-left-radius:3px;}
 .msg.mine .bubble{background:var(--teal);color:#fff;border-bottom-right-radius:3px;}
 .msg-name{font-size:.66rem;color:var(--muted);margin-bottom:.15rem;cursor:pointer;}
