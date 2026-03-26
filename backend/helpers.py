@@ -57,37 +57,66 @@ def now():
     return datetime.datetime.utcnow().isoformat()
 
 def send_reset_email(to_email, reset_token):
-    """SendGrid se password reset email bhejo"""
-    reset_link = f"{FRONTEND_URL}?reset_token={reset_token}"
+    """Send password reset email via SendGrid or Gmail fallback"""
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
 
-    message = Mail(
-        from_email=FROM_EMAIL,
-        to_emails=to_email,
-        subject="Travel Buddy — Reset Your Password",
-        html_content=f"""
-        <div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:2rem;">
-            <h2 style="color:#0EA5E9">Travel Buddy 🌍</h2>
-            <p>Hi there! You requested a password reset.</p>
-            <p>Click the button below to reset your password:</p>
-            <a href="{reset_link}"
-               style="display:inline-block;background:#0EA5E9;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;margin:1rem 0;">
-               Reset Password
-            </a>
-            <p style="color:#94A3B8;font-size:0.85rem;">
-                This link expires in 1 hour.<br/>
-                If you didn't request this, ignore this email.
-            </p>
-        </div>
-        """
-    )
+    # Build correct reset link
+    reset_link = f"{FRONTEND_URL}/my_travel_buddy/reset-password?token={reset_token}"
+
+    html = f"""
+    <div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:2rem;">
+        <h2 style="color:#0EA5E9">Travel Buddy 🌍</h2>
+        <p>Hi! You requested a password reset.</p>
+        <p>Click below to reset your password:</p>
+        <a href="{reset_link}"
+           style="display:inline-block;background:#0EA5E9;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;margin:1rem 0;">
+           Reset Password
+        </a>
+        <p style="color:#94A3B8;font-size:0.85rem;">
+            This link expires in 1 hour.<br/>
+            If you didn't request this, ignore this email.
+        </p>
+    </div>
+    """
+
+    # Try SendGrid first
+    try:
+        sg = SendGridAPIClient(SENDGRID_API_KEY)
+        email = Mail(
+            from_email=FROM_EMAIL,
+            to_emails=to_email,
+            subject="Travel Buddy — Reset Your Password",
+            html_content=html
+        )
+        response = sg.send(email)
+        print(f"Email sent via SendGrid to {to_email}")
+        return True
+    except Exception as e:
+        print(f"SendGrid failed: {str(e)}")
+
+    # Fallback to Gmail SMTP
+    GMAIL = os.getenv("GMAIL_USER")
+    GMAIL_PASS = os.getenv("GMAIL_APP_PASSWORD")
+
+    if not GMAIL or not GMAIL_PASS:
+        print("No fallback email credentials (GMAIL_USER/GMAIL_APP_PASSWORD missing)")
+        return False
+
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = "Travel Buddy — Reset Your Password"
+    msg['From'] = GMAIL
+    msg['To'] = to_email
+    msg.attach(MIMEText(html, 'html'))
 
     try:
-    sg = SendGridAPIClient(SENDGRID_API_KEY)
-    response = sg.send(message)
-    print(f"Email sent! Status: {response.status_code}")
-    return True
-except Exception as e:
-    print(f"Email error details: {str(e)}")
-    print(f"API Key exists: {bool(SENDGRID_API_KEY)}")
-    print(f"From email: {FROM_EMAIL}")
-    return False
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server.login(GMAIL, GMAIL_PASS)
+        server.sendmail(GMAIL, to_email, msg.as_string())
+        server.quit()
+        print(f"Email sent via Gmail to {to_email}")
+        return True
+    except Exception as e:
+        print(f"Gmail error: {str(e)}")
+        return False
