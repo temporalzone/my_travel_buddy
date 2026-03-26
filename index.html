@@ -226,6 +226,16 @@ html,body{height:100%;font-family:'Nunito',sans-serif;background:var(--surface);
 /* HOST BADGE */
 .host-badge{font-size:.64rem;background:#FFFBEB;color:#92400E;border:1px solid #FDE68A;padding:.12rem .45rem;border-radius:100px;font-weight:700;margin-left:.4rem;}
 
+/* REACTIONS */
+.reaction-btn{padding:.28rem .5rem;border:1px solid var(--border);background:#fff;border-radius:16px;cursor:pointer;font-size:.75rem;display:flex;align-items:center;gap:.2rem;transition:all .15s;}
+.reaction-btn:hover{background:var(--surface);border-color:var(--teal);}
+.emoji-react-btn{width:32px;height:32px;border-radius:6px;border:1px solid transparent;background:transparent;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:background .15s;}
+.emoji-react-btn:hover{background:var(--surface);}
+
+/* MENTIONS */
+.mention-item{display:block;width:100%;padding:.5rem .75rem;border:none;background:transparent;text-align:left;cursor:pointer;font-size:.84rem;font-family:'Nunito',sans-serif;transition:background .15s;color:var(--ink);}
+.mention-item:hover{background:var(--surface);}
+
 /* DIVIDER */
 .divider{display:flex;align-items:center;gap:.75rem;color:var(--muted);font-size:.78rem;margin:.9rem 0;}
 .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border);}
@@ -774,18 +784,156 @@ function ExplorePage({trips,user,users,onJoin,onOpen}){
 function ChatPage({trip,user,users,allTrips,onBack,onViewUser,onUpdateTrip}){
   const [msgs,setMsgs]=useState(trip.messages||[]);
   const [inp,setInp]=useState('');
+  const [uploadedImage,setUploadedImage]=useState(null);
+  const [showReactionPicker,setShowReactionPicker]=useState(null);
+  const [typingUsers,setTypingUsers]=useState([]);
+  const [mentions,setMentions]=useState([]);
   const btm=useRef(null);
-  useEffect(()=>btm.current?.scrollIntoView({behavior:'smooth'}),[msgs]);
+  const typingTimeout=useRef(null);
+  
+  const emojis=['👍','❤️','😂','😮','😢','🔥','✨','👏'];
+
+  useEffect(()=>btm.current?.scrollIntoView({behavior:'smooth'}),[msgs,typingUsers]);
+
+  // Poll typing status
+  useEffect(()=>{
+    const poll=setInterval(async()=>{
+      try{
+        const r=await fetch(`${API_BASE}/chats/${trip.id}/typing`,{headers:{'Authorization':`Bearer ${localStorage.token}`}});
+        if(r.ok){
+          const data=await r.json();
+          setTypingUsers(data.map(u=>u.userName));
+        }
+      }catch(e){}
+    },1000);
+    return ()=>clearInterval(poll);
+  },[trip.id]);
+
+  // Send typing indicator
+  const sendTypingIndicator=()=>{
+    fetch(`${API_BASE}/chats/${trip.id}/typing`,{
+      method:'POST',
+      headers:{'Authorization':`Bearer ${localStorage.token}`,'Content-Type':'application/json'},
+      body:JSON.stringify({})
+    }).catch(e=>{});
+  };
 
   const members=trip.memberIds.map(id=>users.find(u=>u.id===id)).filter(Boolean);
 
-  const send=()=>{
-    if(!inp.trim())return;
-    const newMsg={id:uid(),userId:user.id,text:inp.trim(),time:fmt()};
-    const updatedMsgs=[...msgs,newMsg];
-    setMsgs(updatedMsgs);
-    setInp('');
-    onUpdateTrip({...trip,messages:updatedMsgs});
+  // Handle @mention input
+  const handleInputChange=(e)=>{
+    setInp(e.target.value);
+    
+    // Detect @ mention
+    const lastAt=e.target.value.lastIndexOf('@');
+    if(lastAt>-1){
+      const partial=e.target.value.substring(lastAt+1);
+      const matches=members.filter(m=>m.name.toLowerCase().includes(partial.toLowerCase())&&partial.length>0);
+      setMentions(matches);
+    }else{
+      setMentions([]);
+    }
+    
+    sendTypingIndicator();
+  };
+
+  const insertMention=(memberName)=>{
+    const lastAt=inp.lastIndexOf('@');
+    if(lastAt>-1){
+      const before=inp.substring(0,lastAt);
+      const newText=before+'@'+memberName+' ';
+      setInp(newText);
+      setMentions([]);
+    }
+  };
+
+  const handleImageUpload=async(e)=>{
+    const file=e.target.files?.[0];
+    if(!file)return;
+    
+    const reader=new FileReader();
+    reader.onload=(ev)=>{
+      setUploadedImage({
+        name:file.name,
+        data:ev.target.result,
+        type:file.type
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const send=async()=>{
+    if(!inp.trim()&&!uploadedImage)return;
+    
+    try{
+      const msgText=inp.trim();
+      const mentionedUsers=[];
+      members.forEach(m=>{
+        if(msgText.includes(`@${m.name}`)){
+          mentionedUsers.push(m.id);
+        }
+      });
+
+      let newMsg={
+        id:uid(),
+        userId:user.id,
+        text:msgText||'[Image shared]',
+        time:fmt(),
+        reactions:[],
+        readCount:1,
+        mentions:mentionedUsers,
+        profilePic:user.profilePicture,
+        file:uploadedImage||null
+      };
+
+      const updatedMsgs=[...msgs,newMsg];
+      setMsgs(updatedMsgs);
+      onUpdateTrip({...trip,messages:updatedMsgs});
+      
+      setInp('');
+      setUploadedImage(null);
+      
+      // Mark message as read after sending
+      await fetch(`${API_BASE}/chats/${trip.id}/messages/${newMsg.id}/read`,{
+        method:'POST',
+        headers:{'Authorization':`Bearer ${localStorage.token}`,'Content-Type':'application/json'},
+        body:JSON.stringify({})
+      });
+    }catch(e){
+      console.error(e);
+    }
+  };
+
+  const toggleReaction=async(messageId,emoji)=>{
+    try{
+      await fetch(`${API_BASE}/chats/${trip.id}/messages/${messageId}/react`,{
+        method:'POST',
+        headers:{'Authorization':`Bearer ${localStorage.token}`,'Content-Type':'application/json'},
+        body:JSON.stringify({emoji})
+      });
+      
+      // Update local state
+      setMsgs(msgs.map(m=>{
+        if(m.id===messageId){
+          const existing=m.reactions?.find(r=>r.emoji===emoji);
+          if(existing){
+            return{
+              ...m,
+              reactions:m.reactions.map(r=>r.emoji===emoji?{...r,count:r.count+1}:r)
+            };
+          }else{
+            return{
+              ...m,
+              reactions:[...(m.reactions||[]),{emoji,count:1}]
+            };
+          }
+        }
+        return m;
+      }));
+      setShowReactionPicker(null);
+    }catch(e){
+      console.error(e);
+    }
   };
 
   return(
@@ -813,32 +961,130 @@ function ChatPage({trip,user,users,allTrips,onBack,onViewUser,onUpdateTrip}){
                 <p style={{fontSize:'.82rem',color:'var(--muted)'}}>No messages yet. Start the conversation!</p>
               </div>
             )}
-            {msgs.map(m=>{
+            {msgs.map((m,idx)=>{
               const sndr=users.find(u=>u.id===m.userId);
               const mine=m.userId===user.id;
               return(
-                <div key={m.id} className={`msg ${mine?'mine':'theirs'}`}>
-                  {!mine&&<Av name={sndr?.name||'?'} size="xs" onClick={()=>onViewUser(m.userId)}/>}
-                  <div>
-                    {!mine&&<div className="msg-name" onClick={()=>onViewUser(m.userId)}>{sndr?.name||'Unknown'}</div>}
-                    <div className="bubble">{m.text}</div>
-                    <div className="msg-time">{m.time}</div>
+                <div key={m.id} style={{position:'relative'}}>
+                  <div className={`msg ${mine?'mine':'theirs'}`}>
+                    {!mine&&<Av name={sndr?.name||'?'} imageUrl={sndr?.profilePicture} size="xs" onClick={()=>onViewUser(m.userId)}/>}
+                    <div>
+                      {!mine&&<div className="msg-name" onClick={()=>onViewUser(m.userId)}>{sndr?.name||'Unknown'}</div>}
+                      <div className="bubble" style={{position:'relative'}}>
+                        {m.file&&m.file.data&&(
+                          <div style={{marginBottom:'.5rem'}}>
+                            <img src={m.file.data} style={{maxWidth:'200px',borderRadius:8,display:'block'}}/>
+                          </div>
+                        )}
+                        {m.text!=='[Image shared]'&&<span>{m.text}</span>}
+                        {m.mentions&&m.mentions.length>0&&(
+                          <div style={{fontSize:'.7rem',color:'var(--muted)',marginTop:'.3rem'}}>
+                            {m.mentions.map(uid=>{
+                              const u=users.find(x=>x.id===uid);
+                              return <span key={uid}>@{u?.name} </span>;
+                            })}
+                          </div>
+                        )}
+                      </div>
+                      <div className="msg-time">
+                        {m.time}
+                        {mine&&(
+                          <span style={{marginLeft:'.4rem',fontSize:'.8em'}}>
+                            {m.readCount&&m.readCount>1?'✓✓':'✓'}
+                          </span>
+                        )}
+                      </div>
+                      
+                      {/* Reactions Row */}
+                      {m.reactions&&m.reactions.length>0&&(
+                        <div style={{display:'flex',gap:'.3rem',flexWrap:'wrap',marginTop:'.4rem'}}>
+                          {m.reactions.map(r=>(
+                            <button key={r.emoji} className="reaction-btn" 
+                              onClick={()=>toggleReaction(m.id,r.emoji)}
+                              title={`${r.count} reaction${r.count!==1?'s':''}`}>
+                              {r.emoji} {r.count}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Reaction Picker */}
+                      <div style={{marginTop:'.4rem',display:'flex',gap:'.2rem',position:'relative'}}>
+                        <button className="btn btn-xs btn-outline" 
+                          onClick={()=>setShowReactionPicker(showReactionPicker===m.id?null:m.id)}>
+                          😊
+                        </button>
+                        {showReactionPicker===m.id&&(
+                          <div style={{
+                            position:'absolute',bottom:'100%',left:0,background:'var(--card)',border:'1px solid var(--border)',
+                            borderRadius:8,padding:'.5rem',display:'flex',gap:'.3rem',marginBottom:'.4rem',zIndex:10
+                          }}>
+                            {emojis.map(e=>(
+                              <button key={e} className="emoji-react-btn" 
+                                onClick={()=>toggleReaction(m.id,e)}>
+                                {e}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
             })}
+            
+            {/* Typing Indicator */}
+            {typingUsers.length>0&&(
+              <div style={{padding:'.5rem',fontSize:'.75rem',color:'var(--muted)',fontStyle:'italic'}}>
+                {typingUsers.slice(0,2).join(', ')} {typingUsers.length===1?'is':'are'} typing...
+              </div>
+            )}
+            
             <div ref={btm}/>
           </div>
-          <div className="chat-inp-row">
-            <input className="chat-inp" placeholder="Type a message… press Enter to send" value={inp} onChange={e=>setInp(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}}/>
-            <button className="btn btn-primary btn-sm" onClick={send}>Send</button>
+          
+          {/* Image Preview */}
+          {uploadedImage&&(
+            <div style={{padding:'.65rem',background:'var(--surface)',borderRadius:8,marginBottom:'.65rem',display:'flex',gap:'.65rem',alignItems:'center'}}>
+              <img src={uploadedImage.data} style={{width:'60px',height:'60px',borderRadius:4,objectFit:'cover'}}/>
+              <div style={{flex:1}}>
+                <div style={{fontSize:'.75rem',fontWeight:700}}>{uploadedImage.name}</div>
+                <div style={{fontSize:'.7rem',color:'var(--muted)'}}>Ready to send</div>
+              </div>
+              <button className="btn btn-xs btn-outline" onClick={()=>setUploadedImage(null)}>✕</button>
+            </div>
+          )}
+          
+          {/* Input Area */}
+          <div style={{position:'relative'}}>
+            {mentions.length>0&&(
+              <div style={{background:'var(--card)',border:'1px solid var(--border)',borderRadius:8,marginBottom:'.5rem',maxHeight:'120px',overflowY:'auto'}}>
+                {mentions.map(m=>(
+                  <button key={m.id} className="mention-item" onClick={()=>insertMention(m.name)}>
+                    @{m.name}
+                  </button>
+                ))}
+              </div>
+            )}
+            
+            <div className="chat-inp-row">
+              <label style={{cursor:'pointer',display:'flex',alignItems:'center'}}>
+                <input type="file" accept="image/*" onChange={handleImageUpload} style={{display:'none'}}/>
+                <button className="btn btn-sm btn-outline" style={{marginRight:'.5rem'}}>📷</button>
+              </label>
+              <input className="chat-inp" placeholder="Type a message… mention @name … press Enter to send" 
+                value={inp} onChange={handleInputChange} 
+                onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}}/>
+              <button className="btn btn-primary btn-sm" onClick={send}>Send</button>
+            </div>
           </div>
         </div>
         <div className="members-pane">
           <h4 style={{fontFamily:'Syne,sans-serif',fontWeight:800,fontSize:'.88rem',marginBottom:'.85rem'}}>👥 Members ({members.length})</h4>
           {members.map(m=>(
             <div key={m.id} className="m-row" onClick={()=>onViewUser(m.id)}>
-              <Av name={m.name} size="sm"/>
+              <Av name={m.name} imageUrl={m.profilePicture} size="sm"/>
               <div>
                 <div className="m-name">{m.name}{m.id===trip.hostId&&<span className="host-badge">Host</span>}</div>
                 <div className="m-loc">📍 {m.location}</div>

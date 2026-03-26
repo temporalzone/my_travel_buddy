@@ -70,6 +70,49 @@ def init_db():
         )
     """)
 
+    ensure_column("messages", "mentions", "TEXT")
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS read_receipts (
+            id         TEXT PRIMARY KEY,
+            message_id TEXT NOT NULL,
+            user_id    TEXT NOT NULL,
+            read_at    TEXT NOT NULL,
+            UNIQUE (message_id, user_id)
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS message_reactions (
+            id         TEXT PRIMARY KEY,
+            message_id TEXT NOT NULL,
+            user_id    TEXT NOT NULL,
+            emoji      TEXT NOT NULL,
+            reacted_at TEXT NOT NULL,
+            UNIQUE (message_id, user_id, emoji)
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS message_files (
+            id         TEXT PRIMARY KEY,
+            message_id TEXT NOT NULL,
+            file_name  TEXT NOT NULL,
+            file_data  TEXT NOT NULL,
+            file_type  TEXT NOT NULL,
+            uploaded_at TEXT NOT NULL
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS typing_status (
+            user_id    TEXT NOT NULL,
+            trip_id    TEXT NOT NULL,
+            typing_at  TEXT NOT NULL,
+            PRIMARY KEY (user_id, trip_id)
+        )
+    """)
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS email_otps (
             id         TEXT PRIMARY KEY,
