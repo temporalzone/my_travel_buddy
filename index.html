@@ -786,123 +786,135 @@ function ExplorePage({trips,user,users,onJoin,onOpen}){
    CHAT PAGE
 ══════════════════════════════ */
 function ChatPage({trip,user,users,allTrips,onBack,onViewUser,onUpdateTrip}){
-  const [msgs,setMsgs]=useState(trip.messages||[]);
+  const [msgs,setMsgs]=useState([]);
   const [inp,setInp]=useState('');
   const [uploadedImage,setUploadedImage]=useState(null);
   const [showReactionPicker,setShowReactionPicker]=useState(null);
   const [typingUsers,setTypingUsers]=useState([]);
   const [mentions,setMentions]=useState([]);
+  const [memberProfiles,setMemberProfiles]=useState([]);
   const btm=useRef(null);
-  const typingTimeout=useRef(null);
-  
+  const fileInputRef=useRef(null);
+  const BASE='https://my-travel-buddy-kn22.onrender.com/api';
+  const MSG_BASE=`${BASE}/messages`;
+  const auth=()=>({'Authorization':`Bearer ${localStorage.getItem('tb_token')}`,'Content-Type':'application/json'});
+
   const emojis=['👍','❤️','😂','😮','😢','🔥','✨','👏'];
 
   useEffect(()=>btm.current?.scrollIntoView({behavior:'smooth'}),[msgs,typingUsers]);
 
-  // Poll typing status
+  const loadMessages=async()=>{
+    try{
+      const r=await fetch(`${MSG_BASE}/${trip.id}`,{headers:{'Authorization':`Bearer ${localStorage.getItem('tb_token')}`}});
+      if(!r.ok)return;
+      const data=await r.json();
+      if(Array.isArray(data)){
+        setMsgs(data);
+        for(const m of data){
+          await fetch(`${MSG_BASE}/${trip.id}/messages/${m.id}/read`,{method:'POST',headers:auth(),body:JSON.stringify({})});
+        }
+      }
+    }catch(e){}
+  };
+
   useEffect(()=>{
-    const poll=setInterval(async()=>{
+    const loadMembers=async()=>{
+      const ids=trip.memberIds||[];
+      const loaded=await Promise.all(ids.map(async(id)=>{
+        const fromUsers=users.find(u=>u.id===id);
+        if(fromUsers)return fromUsers;
+        try{
+          const r=await fetch(`${BASE}/users/${id}`);
+          if(!r.ok)return null;
+          const d=await r.json();
+          return {id:d.id,name:d.name,location:d.location,profile_picture:d.profile_picture};
+        }catch(_){return null;}
+      }));
+      setMemberProfiles(loaded.filter(Boolean));
+    };
+    loadMembers();
+    loadMessages();
+
+    const msgPoll=setInterval(loadMessages,2000);
+    const typingPoll=setInterval(async()=>{
       try{
-        const r=await fetch(`${API_BASE}/chats/${trip.id}/typing`,{headers:{'Authorization':`Bearer ${localStorage.token}`}});
+        const r=await fetch(`${MSG_BASE}/${trip.id}/typing`,{headers:{'Authorization':`Bearer ${localStorage.getItem('tb_token')}`}});
         if(r.ok){
           const data=await r.json();
           setTypingUsers(data.map(u=>u.userName));
         }
       }catch(e){}
     },1000);
-    return ()=>clearInterval(poll);
+
+    return ()=>{clearInterval(msgPoll);clearInterval(typingPoll);};
   },[trip.id]);
 
-  // Send typing indicator
   const sendTypingIndicator=()=>{
-    fetch(`${API_BASE}/chats/${trip.id}/typing`,{
+    fetch(`${MSG_BASE}/${trip.id}/typing`,{
       method:'POST',
-      headers:{'Authorization':`Bearer ${localStorage.token}`,'Content-Type':'application/json'},
+      headers:auth(),
       body:JSON.stringify({})
-    }).catch(e=>{});
+    }).catch(()=>{});
   };
 
-  const members=trip.memberIds.map(id=>users.find(u=>u.id===id)).filter(Boolean);
+  const members=(memberProfiles.length?memberProfiles:(trip.memberIds||[]).map(id=>users.find(u=>u.id===id)).filter(Boolean));
 
-  // Handle @mention input
   const handleInputChange=(e)=>{
-    setInp(e.target.value);
-    
-    // Detect @ mention
-    const lastAt=e.target.value.lastIndexOf('@');
-    if(lastAt>-1){
-      const partial=e.target.value.substring(lastAt+1);
-      const matches=members.filter(m=>m.name.toLowerCase().includes(partial.toLowerCase())&&partial.length>0);
-      setMentions(matches);
+    const val=e.target.value;
+    setInp(val);
+
+    const match=val.match(/@([^\s@]*)$/);
+    if(match){
+      const partial=(match[1]||'').toLowerCase();
+      const matches=members.filter(m=>m.name&&m.name.toLowerCase().includes(partial));
+      setMentions(matches.slice(0,6));
     }else{
       setMentions([]);
     }
-    
     sendTypingIndicator();
   };
 
   const insertMention=(memberName)=>{
-    const lastAt=inp.lastIndexOf('@');
-    if(lastAt>-1){
-      const before=inp.substring(0,lastAt);
-      const newText=before+'@'+memberName+' ';
-      setInp(newText);
-      setMentions([]);
-    }
+    const newText=inp.replace(/@([^\s@]*)$/,`@${memberName} `);
+    setInp(newText);
+    setMentions([]);
   };
 
-  const handleImageUpload=async(e)=>{
+  const handleImageUpload=(e)=>{
     const file=e.target.files?.[0];
     if(!file)return;
-    
     const reader=new FileReader();
     reader.onload=(ev)=>{
-      setUploadedImage({
-        name:file.name,
-        data:ev.target.result,
-        type:file.type
-      });
+      setUploadedImage({name:file.name,data:ev.target.result,type:file.type});
     };
     reader.readAsDataURL(file);
   };
 
   const send=async()=>{
     if(!inp.trim()&&!uploadedImage)return;
-    
     try{
       const msgText=inp.trim();
-      const mentionedUsers=[];
-      members.forEach(m=>{
-        if(msgText.includes(`@${m.name}`)){
-          mentionedUsers.push(m.id);
-        }
-      });
+      const mentionIds=members
+        .filter(m=>msgText.includes(`@${m.name}`))
+        .map(m=>m.id);
 
-      let newMsg={
-        id:uid(),
-        userId:user.id,
-        text:msgText||'[Image shared]',
-        time:fmt(),
-        reactions:[],
-        readCount:1,
-        mentions:mentionedUsers,
-        profilePic:user.profilePicture,
-        file:uploadedImage||null
-      };
-
-      const updatedMsgs=[...msgs,newMsg];
-      setMsgs(updatedMsgs);
-      onUpdateTrip({...trip,messages:updatedMsgs});
-      
-      setInp('');
-      setUploadedImage(null);
-      
-      // Mark message as read after sending
-      await fetch(`${API_BASE}/chats/${trip.id}/messages/${newMsg.id}/read`,{
+      const res=await fetch(`${MSG_BASE}/${trip.id}`,{
         method:'POST',
-        headers:{'Authorization':`Bearer ${localStorage.token}`,'Content-Type':'application/json'},
-        body:JSON.stringify({})
+        headers:auth(),
+        body:JSON.stringify({
+          text:msgText,
+          mentions:mentionIds,
+          file_data:uploadedImage?.data||null,
+          file_name:uploadedImage?.name||null,
+          file_type:uploadedImage?.type||null
+        })
       });
+
+      if(res.ok){
+        setInp('');
+        setUploadedImage(null);
+        await loadMessages();
+      }
     }catch(e){
       console.error(e);
     }
@@ -910,31 +922,13 @@ function ChatPage({trip,user,users,allTrips,onBack,onViewUser,onUpdateTrip}){
 
   const toggleReaction=async(messageId,emoji)=>{
     try{
-      await fetch(`${API_BASE}/chats/${trip.id}/messages/${messageId}/react`,{
+      await fetch(`${MSG_BASE}/${trip.id}/messages/${messageId}/react`,{
         method:'POST',
-        headers:{'Authorization':`Bearer ${localStorage.token}`,'Content-Type':'application/json'},
+        headers:auth(),
         body:JSON.stringify({emoji})
       });
-      
-      // Update local state
-      setMsgs(msgs.map(m=>{
-        if(m.id===messageId){
-          const existing=m.reactions?.find(r=>r.emoji===emoji);
-          if(existing){
-            return{
-              ...m,
-              reactions:m.reactions.map(r=>r.emoji===emoji?{...r,count:r.count+1}:r)
-            };
-          }else{
-            return{
-              ...m,
-              reactions:[...(m.reactions||[]),{emoji,count:1}]
-            };
-          }
-        }
-        return m;
-      }));
       setShowReactionPicker(null);
+      await loadMessages();
     }catch(e){
       console.error(e);
     }
@@ -965,15 +959,15 @@ function ChatPage({trip,user,users,allTrips,onBack,onViewUser,onUpdateTrip}){
                 <p style={{fontSize:'.82rem',color:'var(--muted)'}}>No messages yet. Start the conversation!</p>
               </div>
             )}
-            {msgs.map((m,idx)=>{
-              const sndr=users.find(u=>u.id===m.userId);
+            {msgs.map((m)=>{
+              const sndr=memberProfiles.find(u=>u.id===m.userId)||users.find(u=>u.id===m.userId);
               const mine=m.userId===user.id;
               return(
                 <div key={m.id} style={{position:'relative'}}>
                   <div className={`msg ${mine?'mine':'theirs'}`}>
-                    {!mine&&<Av name={sndr?.name||'?'} imageUrl={sndr?.profilePicture} size="xs" onClick={()=>onViewUser(m.userId)}/>}
+                    {!mine&&<Av name={sndr?.name||m.userName||'?'} imageUrl={sndr?.profile_picture||m.profilePic} size="xs" onClick={()=>onViewUser(m.userId)}/>}
                     <div>
-                      {!mine&&<div className="msg-name" onClick={()=>onViewUser(m.userId)}>{sndr?.name||'Unknown'}</div>}
+                      {!mine&&<div className="msg-name" onClick={()=>onViewUser(m.userId)}>{sndr?.name||m.userName||'Unknown'}</div>}
                       <div className="bubble" style={{position:'relative'}}>
                         {m.file&&m.file.data&&(
                           <div style={{marginBottom:'.5rem'}}>
@@ -984,7 +978,7 @@ function ChatPage({trip,user,users,allTrips,onBack,onViewUser,onUpdateTrip}){
                         {m.mentions&&m.mentions.length>0&&(
                           <div style={{fontSize:'.7rem',color:'var(--muted)',marginTop:'.3rem'}}>
                             {m.mentions.map(uid=>{
-                              const u=users.find(x=>x.id===uid);
+                              const u=memberProfiles.find(x=>x.id===uid)||users.find(x=>x.id===uid);
                               return <span key={uid}>@{u?.name} </span>;
                             })}
                           </div>
@@ -1073,10 +1067,8 @@ function ChatPage({trip,user,users,allTrips,onBack,onViewUser,onUpdateTrip}){
             )}
             
             <div className="chat-inp-row">
-              <label style={{cursor:'pointer',display:'flex',alignItems:'center'}}>
-                <input type="file" accept="image/*" onChange={handleImageUpload} style={{display:'none'}}/>
-                <button className="btn btn-sm btn-outline" style={{marginRight:'.5rem'}}>📷</button>
-              </label>
+              <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} style={{display:'none'}}/>
+              <button className="btn btn-sm btn-outline" style={{marginRight:'.5rem'}} onClick={()=>fileInputRef.current?.click()}>📷</button>
               <input className="chat-inp" placeholder="Type a message… mention @name … press Enter to send" 
                 value={inp} onChange={handleInputChange} 
                 onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}}/>
@@ -1088,7 +1080,7 @@ function ChatPage({trip,user,users,allTrips,onBack,onViewUser,onUpdateTrip}){
           <h4 style={{fontFamily:'Syne,sans-serif',fontWeight:800,fontSize:'.88rem',marginBottom:'.85rem'}}>👥 Members ({members.length})</h4>
           {members.map(m=>(
             <div key={m.id} className="m-row" onClick={()=>onViewUser(m.id)}>
-              <Av name={m.name} imageUrl={m.profilePicture} size="sm"/>
+              <Av name={m.name} imageUrl={m.profile_picture||m.profilePicture} size="sm"/>
               <div>
                 <div className="m-name">{m.name}{m.id===trip.hostId&&<span className="host-badge">Host</span>}</div>
                 <div className="m-loc">📍 {m.location}</div>

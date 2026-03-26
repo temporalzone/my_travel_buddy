@@ -5,6 +5,14 @@ from helpers import get_current_user, now
 
 message_bp = Blueprint("messages", __name__)
 
+
+def _require_trip_member(conn, trip_id, user_id):
+    return conn.execute(
+        "SELECT 1 FROM trip_members WHERE trip_id = ? AND user_id = ?",
+        (trip_id, user_id),
+    ).fetchone()
+
+
 @message_bp.route("/<trip_id>", methods=["GET"])
 def get_messages(trip_id):
     user_id = get_current_user()
@@ -12,53 +20,74 @@ def get_messages(trip_id):
         return jsonify({"error": "Unauthorized"}), 401
 
     conn = get_db()
-
-    member = conn.execute("""
-        SELECT 1 FROM trip_members WHERE trip_id = ? AND user_id = ?
-    """, (trip_id, user_id)).fetchone()
-
-    if not member:
+    if not _require_trip_member(conn, trip_id, user_id):
         conn.close()
         return jsonify({"error": "You are not a member of this trip"}), 403
 
-    messages = conn.execute("""
-        SELECT m.id, m.text, m.sent_at, m.mentions, u.id as user_id, u.name as user_name, u.profile_picture
+    messages = conn.execute(
+        """
+        SELECT m.id, m.text, m.sent_at, m.mentions,
+               u.id AS user_id, u.name AS user_name, u.profile_picture
         FROM messages m
         JOIN users u ON m.user_id = u.id
         WHERE m.trip_id = ?
         ORDER BY m.sent_at ASC
-    """, (trip_id,)).fetchall()
-
-    conn.close()
+        """,
+        (trip_id,),
+    ).fetchall()
 
     result = []
     for msg in messages:
-        # Get reactions for this message
-        reactions_db = conn = get_db()
-        reactions = reactions_db.execute("""
-            SELECT emoji, COUNT(*) as count FROM message_reactions 
-            WHERE message_id = ? GROUP BY emoji
-        """, (msg["id"],)).fetchall()
-        reactions_list = [{"emoji": r["emoji"], "count": r["count"]} for r in reactions]
-        
-        # Get read receipts for this message
-        read_count = reactions_db.execute("""
-            SELECT COUNT(*) as count FROM read_receipts WHERE message_id = ?
-        """, (msg["id"],)).fetchone()["count"]
-        reactions_db.close()
-        
-        result.append({
-            "id":           msg["id"],
-            "text":         msg["text"],
-            "time":         msg["sent_at"][11:16],
-            "userId":       msg["user_id"],
-            "userName":     msg["user_name"],
-            "profilePic":   msg["profile_picture"],
-            "mentions":     msg["mentions"].split(",") if msg["mentions"] else [],
-            "reactions":    reactions_list,
-            "readCount":    read_count
-        })
+        reactions = conn.execute(
+            """
+            SELECT emoji, COUNT(*) AS count
+            FROM message_reactions
+            WHERE message_id = ?
+            GROUP BY emoji
+            """,
+            (msg["id"],),
+        ).fetchall()
 
+        read_count = conn.execute(
+            "SELECT COUNT(*) AS count FROM read_receipts WHERE message_id = ?",
+            (msg["id"],),
+        ).fetchone()["count"]
+
+        file_row = conn.execute(
+            """
+            SELECT file_name, file_data, file_type
+            FROM message_files
+            WHERE message_id = ?
+            ORDER BY uploaded_at DESC
+            LIMIT 1
+            """,
+            (msg["id"],),
+        ).fetchone()
+
+        result.append(
+            {
+                "id": msg["id"],
+                "text": msg["text"],
+                "time": msg["sent_at"][11:16],
+                "userId": msg["user_id"],
+                "userName": msg["user_name"],
+                "profilePic": msg["profile_picture"],
+                "mentions": msg["mentions"].split(",") if msg["mentions"] else [],
+                "reactions": [{"emoji": r["emoji"], "count": r["count"]} for r in reactions],
+                "readCount": read_count,
+                "file": (
+                    {
+                        "name": file_row["file_name"],
+                        "data": file_row["file_data"],
+                        "type": file_row["file_type"],
+                    }
+                    if file_row
+                    else None
+                ),
+            }
+        )
+
+    conn.close()
     return jsonify(result), 200
 
 
@@ -68,38 +97,55 @@ def send_message(trip_id):
     if not user_id:
         return jsonify({"error": "Unauthorized"}), 401
 
-    data = request.get_json()
+    data = request.get_json() or {}
+    text = (data.get("text") or "").strip()
+    mentions = data.get("mentions") or []
+    file_data = data.get("file_data")
+    file_name = data.get("file_name") or "image"
+    file_type = data.get("file_type") or "image/jpeg"
 
-    if not data.get("text") or not data["text"].strip():
+    if not text and not file_data:
         return jsonify({"error": "Message cannot be empty"}), 400
 
     conn = get_db()
-
-    member = conn.execute("""
-        SELECT 1 FROM trip_members WHERE trip_id = ? AND user_id = ?
-    """, (trip_id, user_id)).fetchone()
-
-    if not member:
+    if not _require_trip_member(conn, trip_id, user_id):
         conn.close()
         return jsonify({"error": "You are not a member of this trip"}), 403
 
-    msg_id  = str(uuid.uuid4())
+    msg_id = str(uuid.uuid4())
     sent_at = now()
 
-    conn.execute("""
-        INSERT INTO messages (id, trip_id, user_id, text, sent_at)
-        VALUES (?, ?, ?, ?, ?)
-    """, (msg_id, trip_id, user_id, data["text"].strip(), sent_at))
+    conn.execute(
+        """
+        INSERT INTO messages (id, trip_id, user_id, text, sent_at, mentions)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (msg_id, trip_id, user_id, text if text else "[Image shared]", sent_at, ",".join(mentions)),
+    )
+
+    if file_data:
+        file_id = str(uuid.uuid4())
+        conn.execute(
+            """
+            INSERT INTO message_files (id, message_id, file_name, file_data, file_type, uploaded_at)
+            VALUES (?, ?, ?, ?, ?, ?)
+            """,
+            (file_id, msg_id, file_name, file_data, file_type, sent_at),
+        )
 
     conn.commit()
     conn.close()
 
-    return jsonify({
-        "id":     msg_id,
-        "text":   data["text"].strip(),
-        "time":   sent_at[11:16],
-        "userId": user_id
-    }), 201
+    return jsonify(
+        {
+            "id": msg_id,
+            "text": text if text else "[Image shared]",
+            "time": sent_at[11:16],
+            "userId": user_id,
+            "mentions": mentions,
+            "file": ({"name": file_name, "data": file_data, "type": file_type} if file_data else None),
+        }
+    ), 201
 
 
 @message_bp.route("/<trip_id>/messages/<message_id>/read", methods=["POST"])
@@ -109,22 +155,20 @@ def mark_message_read(trip_id, message_id):
         return jsonify({"error": "Unauthorized"}), 401
 
     conn = get_db()
-    member = conn.execute("""
-        SELECT 1 FROM trip_members WHERE trip_id = ? AND user_id = ?
-    """, (trip_id, user_id)).fetchone()
-
-    if not member:
+    if not _require_trip_member(conn, trip_id, user_id):
         conn.close()
         return jsonify({"error": "Not a member"}), 403
 
     receipt_id = str(uuid.uuid4())
     read_at = now()
 
-    # Upsert read receipt
-    conn.execute("""
+    conn.execute(
+        """
         INSERT OR REPLACE INTO read_receipts (id, message_id, user_id, read_at)
         VALUES (?, ?, ?, ?)
-    """, (receipt_id, message_id, user_id, read_at))
+        """,
+        (receipt_id, message_id, user_id, read_at),
+    )
 
     conn.commit()
     conn.close()
@@ -138,25 +182,24 @@ def react_to_message(trip_id, message_id):
     if not user_id:
         return jsonify({"error": "Unauthorized"}), 401
 
-    data = request.get_json()
-    emoji = data.get("emoji", "👍")
+    data = request.get_json() or {}
+    emoji = data.get("emoji", "")
 
     conn = get_db()
-    member = conn.execute("""
-        SELECT 1 FROM trip_members WHERE trip_id = ? AND user_id = ?
-    """, (trip_id, user_id)).fetchone()
-
-    if not member:
+    if not _require_trip_member(conn, trip_id, user_id):
         conn.close()
         return jsonify({"error": "Not a member"}), 403
 
     reaction_id = str(uuid.uuid4())
     reacted_at = now()
 
-    conn.execute("""
+    conn.execute(
+        """
         INSERT OR REPLACE INTO message_reactions (id, message_id, user_id, emoji, reacted_at)
         VALUES (?, ?, ?, ?, ?)
-    """, (reaction_id, message_id, user_id, emoji, reacted_at))
+        """,
+        (reaction_id, message_id, user_id, emoji, reacted_at),
+    )
 
     conn.commit()
     conn.close()
@@ -170,22 +213,21 @@ def remove_reaction(trip_id, message_id):
     if not user_id:
         return jsonify({"error": "Unauthorized"}), 401
 
-    data = request.get_json()
-    emoji = data.get("emoji", "👍")
+    data = request.get_json(silent=True) or {}
+    emoji = data.get("emoji", "")
 
     conn = get_db()
-    member = conn.execute("""
-        SELECT 1 FROM trip_members WHERE trip_id = ? AND user_id = ?
-    """, (trip_id, user_id)).fetchone()
-
-    if not member:
+    if not _require_trip_member(conn, trip_id, user_id):
         conn.close()
         return jsonify({"error": "Not a member"}), 403
 
-    conn.execute("""
-        DELETE FROM message_reactions 
+    conn.execute(
+        """
+        DELETE FROM message_reactions
         WHERE message_id = ? AND user_id = ? AND emoji = ?
-    """, (message_id, user_id, emoji))
+        """,
+        (message_id, user_id, emoji),
+    )
 
     conn.commit()
     conn.close()
@@ -200,20 +242,17 @@ def set_typing_status(trip_id):
         return jsonify({"error": "Unauthorized"}), 401
 
     conn = get_db()
-    member = conn.execute("""
-        SELECT 1 FROM trip_members WHERE trip_id = ? AND user_id = ?
-    """, (trip_id, user_id)).fetchone()
-
-    if not member:
+    if not _require_trip_member(conn, trip_id, user_id):
         conn.close()
         return jsonify({"error": "Not a member"}), 403
 
-    typing_at = now()
-
-    conn.execute("""
+    conn.execute(
+        """
         INSERT OR REPLACE INTO typing_status (user_id, trip_id, typing_at)
         VALUES (?, ?, ?)
-    """, (user_id, trip_id, typing_at))
+        """,
+        (user_id, trip_id, now()),
+    )
 
     conn.commit()
     conn.close()
@@ -228,27 +267,31 @@ def get_typing_status(trip_id):
         return jsonify({"error": "Unauthorized"}), 401
 
     conn = get_db()
-    member = conn.execute("""
-        SELECT 1 FROM trip_members WHERE trip_id = ? AND user_id = ?
-    """, (trip_id, user_id)).fetchone()
-
-    if not member:
+    if not _require_trip_member(conn, trip_id, user_id):
         conn.close()
         return jsonify({"error": "Not a member"}), 403
 
-    typing = conn.execute("""
-        SELECT u.id, u.name FROM typing_status t
+    typing = conn.execute(
+        """
+        SELECT u.id, u.name
+        FROM typing_status t
         JOIN users u ON t.user_id = u.id
-        WHERE t.trip_id = ? AND t.user_id != ?
-        AND datetime(t.typing_at) > datetime('now', '-3 seconds')
-    """, (trip_id, user_id)).fetchall()
+        WHERE t.trip_id = ?
+          AND t.user_id != ?
+          AND datetime(t.typing_at) > datetime('now', '-3 seconds')
+        """,
+        (trip_id, user_id),
+    ).fetchall()
 
     conn.close()
 
-    return jsonify([{
-        "userId": t["id"],
-        "userName": t["name"]
-    } for t in typing]), 200
+    return jsonify([
+        {
+            "userId": t["id"],
+            "userName": t["name"],
+        }
+        for t in typing
+    ]), 200
 
 
 @message_bp.route("/<trip_id>/upload", methods=["POST"])
@@ -258,11 +301,7 @@ def upload_file(trip_id):
         return jsonify({"error": "Unauthorized"}), 401
 
     conn = get_db()
-    member = conn.execute("""
-        SELECT 1 FROM trip_members WHERE trip_id = ? AND user_id = ?
-    """, (trip_id, user_id)).fetchone()
-
-    if not member:
+    if not _require_trip_member(conn, trip_id, user_id):
         conn.close()
         return jsonify({"error": "Not a member"}), 403
 
@@ -271,21 +310,30 @@ def upload_file(trip_id):
     file_type = request.form.get("file_type", "image/jpeg")
 
     if not file_data:
+        conn.close()
         return jsonify({"error": "No file data"}), 400
 
+    msg_id = str(uuid.uuid4())
     file_id = str(uuid.uuid4())
     uploaded_at = now()
 
-    conn.execute("""
+    conn.execute(
+        """
+        INSERT INTO messages (id, trip_id, user_id, text, sent_at, mentions)
+        VALUES (?, ?, ?, ?, ?, ?)
+        """,
+        (msg_id, trip_id, user_id, "[Image shared]", uploaded_at, ""),
+    )
+
+    conn.execute(
+        """
         INSERT INTO message_files (id, message_id, file_name, file_data, file_type, uploaded_at)
         VALUES (?, ?, ?, ?, ?, ?)
-    """, (file_id, file_id, file_name, file_data, file_type, uploaded_at))
+        """,
+        (file_id, msg_id, file_name, file_data, file_type, uploaded_at),
+    )
 
     conn.commit()
     conn.close()
 
-    return jsonify({
-        "fileId": file_id,
-        "fileName": file_name,
-        "fileType": file_type
-    }), 201
+    return jsonify({"fileId": file_id, "messageId": msg_id, "fileName": file_name, "fileType": file_type}), 201
