@@ -158,3 +158,65 @@ def send_reset_email(to_email, reset_token):
     except Exception as e:
         print(f"Gmail STARTTLS error: {str(e)}")
         return False, f"{sendgrid_error}; Gmail SSL error: {gmail_ssl_error}; Gmail STARTTLS error: {str(e)}"
+
+
+def send_join_request_email(host_email, host_name, trip_title, requester_name, requester_email):
+    """Send host a notification that a user requested to join their trip."""
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+
+    base_url = (FRONTEND_URL or "").rstrip("/")
+    if base_url.endswith("/my_travel_buddy"):
+        app_link = f"{base_url}/"
+    else:
+        app_link = f"{base_url}/my_travel_buddy/"
+
+    html = f"""
+    <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:2rem;">
+        <h2 style="color:#0EA5E9">Travel Buddy 🌍</h2>
+        <p>Hi {host_name},</p>
+        <p><strong>{requester_name}</strong> ({requester_email}) requested to join your trip:</p>
+        <p style="font-size:1rem;"><strong>{trip_title}</strong></p>
+        <p>Open your app and review the request in the approvals section.</p>
+        <a href="{app_link}"
+           style="display:inline-block;background:#0EA5E9;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;margin:1rem 0;">
+           Open Travel Buddy
+        </a>
+    </div>
+    """
+
+    try:
+        if SENDGRID_API_KEY and FROM_EMAIL:
+            sg = SendGridAPIClient(SENDGRID_API_KEY)
+            email = Mail(
+                from_email=FROM_EMAIL,
+                to_emails=host_email,
+                subject="New Trip Join Request",
+                html_content=html
+            )
+            response = sg.send(email)
+            if getattr(response, "status_code", None) in (200, 202):
+                return True, "Join request email sent via SendGrid"
+    except Exception as e:
+        print(f"Join request SendGrid exception: {str(e)}")
+
+    gmail_user = os.getenv("GMAIL_USER")
+    gmail_pass = os.getenv("GMAIL_APP_PASSWORD")
+    if not gmail_user or not gmail_pass:
+        return False, "Join request email failed (no email provider available)"
+
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = "New Trip Join Request"
+    msg['From'] = gmail_user
+    msg['To'] = host_email
+    msg.attach(MIMEText(html, 'html'))
+
+    try:
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=20)
+        server.login(gmail_user, gmail_pass)
+        server.sendmail(gmail_user, host_email, msg.as_string())
+        server.quit()
+        return True, "Join request email sent via Gmail"
+    except Exception as e:
+        return False, f"Join request email failed: {str(e)}"

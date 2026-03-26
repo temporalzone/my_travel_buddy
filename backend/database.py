@@ -61,6 +61,18 @@ def init_db():
         )
     """)
 
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS join_requests (
+            id           TEXT PRIMARY KEY,
+            trip_id      TEXT NOT NULL,
+            requester_id TEXT NOT NULL,
+            status       TEXT NOT NULL DEFAULT 'pending',
+            requested_at TEXT NOT NULL,
+            reviewed_at  TEXT,
+            UNIQUE (trip_id, requester_id)
+        )
+    """)
+
     conn.commit()
     conn.close()
     print("✅ Database ready!")

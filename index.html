@@ -514,7 +514,7 @@ function AuthScreen({onLogin,users,setUsers}){
 /* ══════════════════════════════
    TRIP CARD
 ══════════════════════════════ */
-function TripCard({trip,user,onJoin,onOpen,joined,users}){
+function TripCard({trip,user,onJoin,onOpen,joined,users,pending}){
   const isHost=trip.hostId===user.id;
   const memberAvatars=trip.memberIds.slice(0,4);
   return(
@@ -544,6 +544,8 @@ function TripCard({trip,user,onJoin,onOpen,joined,users}){
         <div style={{marginTop:'.85rem',display:'flex',gap:'.45rem',alignItems:'center'}}>
           {joined?(
             <button className="btn btn-primary btn-sm" style={{flex:1}} onClick={e=>{e.stopPropagation();onOpen(trip.id);}}>💬 Open Chat</button>
+          ):pending?(
+            <button className="btn btn-sm" style={{flex:1,background:'#FFFBEB',color:'#92400E',border:'1px solid #FDE68A',cursor:'default'}} disabled>⏳ Approval Pending</button>
           ):trip.seats>0?(
             <button className="btn btn-emerald btn-sm" style={{flex:1}} onClick={e=>{e.stopPropagation();onJoin(trip.id);}}>✈️ Join Trip</button>
           ):(
@@ -559,9 +561,10 @@ function TripCard({trip,user,onJoin,onOpen,joined,users}){
 /* ══════════════════════════════
    DASHBOARD
 ══════════════════════════════ */
-function Dashboard({user,trips,users,onJoin,onOpen,setPage}){
+function Dashboard({user,trips,users,onJoin,onOpen,setPage,pendingRequests,onApproveRequest}){
   const myTrips=trips.filter(t=>t.memberIds.includes(user.id));
   const openTrips=trips.filter(t=>!t.memberIds.includes(user.id)&&t.seats>0);
+  const hostPending=(pendingRequests||[]);
 
   return(
     <div className="fade-up">
@@ -587,6 +590,19 @@ function Dashboard({user,trips,users,onJoin,onOpen,setPage}){
         ))}
       </div>
 
+      {hostPending.length>0&&<>
+        <div className="sec-head"><h3>📩 Join Requests For Your Trips</h3></div>
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:'1rem',marginBottom:'1.5rem'}}>
+          {hostPending.map(r=>(
+            <div key={r.id} style={{background:'#fff',border:'1px solid var(--border)',borderRadius:14,padding:'1rem'}}>
+              <div style={{fontFamily:'Syne,sans-serif',fontWeight:800,fontSize:'.92rem',marginBottom:'.35rem'}}>{r.tripTitle}</div>
+              <div style={{fontSize:'.82rem',color:'var(--muted)',marginBottom:'.7rem'}}>{r.requesterName} ({r.requesterEmail}) wants to join</div>
+              <button className="btn btn-emerald btn-sm" onClick={()=>onApproveRequest(r.id)}>✅ Approve</button>
+            </div>
+          ))}
+        </div>
+      </>}
+
       {myTrips.length>0&&<>
         <div className="sec-head"><h3>✈️ My Trips</h3></div>
         <div className="trips-grid" style={{marginBottom:'1.75rem'}}>
@@ -600,7 +616,7 @@ function Dashboard({user,trips,users,onJoin,onOpen,setPage}){
       </div>
       {openTrips.length>0?(
         <div className="trips-grid">
-          {openTrips.slice(0,3).map(t=><TripCard key={t.id} trip={t} user={user} users={users} onJoin={onJoin} onOpen={onOpen}/>)}
+          {openTrips.slice(0,3).map(t=><TripCard key={t.id} trip={t} user={user} users={users} onJoin={onJoin} onOpen={onOpen} pending={!!t.myRequestPending}/>)}
         </div>
       ):(
         <div className="empty" style={{background:'#fff',borderRadius:16,border:'1px solid var(--border)'}}>
@@ -645,7 +661,7 @@ function ExplorePage({trips,user,users,onJoin,onOpen}){
         <div className="trips-grid">
           {list.map(t=>{
             const joined=t.memberIds.includes(user.id);
-            return <TripCard key={t.id} trip={t} user={user} users={users} onJoin={onJoin} onOpen={onOpen} joined={joined}/>;
+            return <TripCard key={t.id} trip={t} user={user} users={users} onJoin={onJoin} onOpen={onOpen} joined={joined} pending={!!t.myRequestPending}/>;
           })}
         </div>
       ):(
@@ -932,7 +948,7 @@ function UserModal({uid_,users,onClose}){
 /* ══════════════════════════════
    APP SHELL
 ══════════════════════════════ */
-function AppShell({user,trips,users,onLogout,onUpdate,onJoin,onCreateTrip,onUpdateTrip}){
+function AppShell({user,trips,users,onLogout,onUpdate,onJoin,onCreateTrip,onUpdateTrip,pendingRequests,onApproveRequest}){
   const [page,setPage]=useState('dashboard');
   const [openTripId,setOpenTripId]=useState(null);
   const [viewUid,setViewUid]=useState(null);
@@ -940,11 +956,13 @@ function AppShell({user,trips,users,onLogout,onUpdate,onJoin,onCreateTrip,onUpda
 
   const showToast=m=>{setToast(null);setTimeout(()=>setToast(m),10);};
 
-  const joinTrip=tid=>{
-    onJoin(tid,user.id);
-    showToast('🎉 You joined the trip! Open the group chat below.');
-    setOpenTripId(tid);
-    setPage('chat');
+  const joinTrip=async tid=>{
+    const res=await onJoin(tid,user.id);
+    if(res&&res.error){
+      showToast(`❌ ${res.error}`);
+      return;
+    }
+    showToast(res?.message||'Request sent. You will be added once the creator approves.');
   };
   const openTrip=tid=>{setOpenTripId(tid);setPage('chat');};
 
@@ -1004,9 +1022,9 @@ function AppShell({user,trips,users,onLogout,onUpdate,onJoin,onCreateTrip,onUpda
           </div>
         </div>
         <div className="main">
-          {page==='dashboard'&&<Dashboard user={user} trips={trips} users={users} onJoin={joinTrip} onOpen={openTrip} setPage={setPage}/>}
+          {page==='dashboard'&&<Dashboard user={user} trips={trips} users={users} onJoin={joinTrip} onOpen={openTrip} setPage={setPage} pendingRequests={pendingRequests} onApproveRequest={onApproveRequest}/>}
           {page==='explore'&&<ExplorePage trips={trips} user={user} users={users} onJoin={joinTrip} onOpen={openTrip}/>}
-          {page==='create'&&<CreatePage user={user} onCreate={t=>{onCreateTrip(t);showToast('🚀 Trip created! Others can now find and join it.');}} setPage={setPage}/>}
+          {page==='create'&&<CreatePage user={user} onCreate={async t=>{const out=await onCreateTrip(t); if(out&&out.error){showToast(`❌ ${out.error}`);return;} showToast('🚀 Trip created! Others can now find and join it.');}} setPage={setPage}/>}
           {page==='profile'&&<ProfilePage user={user} onUpdate={onUpdate} onLogout={onLogout} showToast={showToast}/>}
           {page==='chat'&&openTripObj&&(
             <ChatPage trip={openTripObj} user={user} users={users} allTrips={trips} onBack={()=>setPage('dashboard')} onViewUser={id=>setViewUid(id)} onUpdateTrip={onUpdateTrip}/>
@@ -1026,6 +1044,7 @@ function AppShell({user,trips,users,onLogout,onUpdate,onJoin,onCreateTrip,onUpda
 function App(){
   const [users,setUsers]=useState([]);
   const [trips,setTrips]=useState([]);
+  const [pendingRequests,setPendingRequests]=useState([]);
   const [me,setMe]=useState(null);
   const [loading,setLoading]=useState(true);
   const BASE='https://my-travel-buddy-kn22.onrender.com/api';
@@ -1041,6 +1060,7 @@ function App(){
         if(data.error){localStorage.removeItem('tb_token');setLoading(false);return;}
         setMe(data);
         loadTrips();
+        loadPendingRequests();
         setLoading(false);
       }).catch(()=>setLoading(false));
   },[]);
@@ -1051,8 +1071,15 @@ function App(){
     if(Array.isArray(data))setTrips(data);
   };
 
-  const login=u=>{setMe(u);loadTrips();};
-  const logout=()=>{setMe(null);localStorage.removeItem('tb_token');setTrips([]);};
+  const loadPendingRequests=async()=>{
+    const res=await fetch(BASE+'/trips/requests/pending',{headers:authHeaders()});
+    const data=await res.json();
+    if(Array.isArray(data))setPendingRequests(data);
+    else setPendingRequests([]);
+  };
+
+  const login=u=>{setMe(u);loadTrips();loadPendingRequests();};
+  const logout=()=>{setMe(null);localStorage.removeItem('tb_token');setTrips([]);setPendingRequests([]);};
 
   const updateUser=async(u)=>{
     const res=await fetch('https://my-travel-buddy-kn22.onrender.com/api/users/me',{
@@ -1064,11 +1091,15 @@ function App(){
     setMe(u);
   };
 
-  const joinTrip=(tid,uid)=>{
-    setTrips(ts=>ts.map(t=>{
-      if(t.id!==tid||t.memberIds.includes(uid))return t;
-      return {...t,memberIds:[...t.memberIds,uid],seats:Math.max(0,t.seats-1)};
-    }));
+  const joinTrip=async(tid,uid)=>{
+    const res=await fetch(`${BASE}/trips/${tid}/join`,{
+      method:'POST',
+      headers:authHeaders()
+    });
+    const data=await res.json();
+    await loadTrips();
+    await loadPendingRequests();
+    return data;
   };
 
   const createTrip=async(t)=>{
@@ -1078,8 +1109,20 @@ function App(){
       body:JSON.stringify(t)
     });
     const data=await res.json();
-    if(data.error){showToast(data.error);return;}
+    if(data.error){return data;}
     await loadTrips();
+    return data;
+  };
+
+  const approveRequest=async(requestId)=>{
+    const res=await fetch(`${BASE}/trips/requests/${requestId}/approve`,{
+      method:'POST',
+      headers:authHeaders()
+    });
+    const data=await res.json();
+    await loadTrips();
+    await loadPendingRequests();
+    return data;
   };
 
   const updateTrip=t=>{
@@ -1100,6 +1143,13 @@ function App(){
       onJoin={joinTrip}
       onCreateTrip={createTrip}
       onUpdateTrip={updateTrip}
+      pendingRequests={pendingRequests}
+      onApproveRequest={async (rid)=>{
+        const out=await approveRequest(rid);
+        if(out&&out.error){
+          alert(out.error);
+        }
+      }}
     />
   );
 }
