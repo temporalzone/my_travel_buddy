@@ -306,42 +306,47 @@ function AuthScreen({onLogin,users,setUsers}){
   const [ok,setOk]=useState('');
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
 
-  const login=()=>{
+  const login=async()=>{
     setErr('');
     if(!f.email||!f.pw){setErr('Please fill all fields.');return;}
-    const u=users.find(x=>x.email.toLowerCase()===f.email.toLowerCase()&&x.password===f.pw);
-    if(!u){setErr('Incorrect email or password.');return;}
-    onLogin(u);
+    const res=await fetch('https://my-travel-buddy-kn22.onrender.com/api/auth/login',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email:f.email,password:f.pw})
+    });
+    const data=await res.json();
+    if(data.error){setErr(data.error);return;}
+    localStorage.setItem('tb_token',data.token);
+    onLogin(data.user);
   };
-  const register=()=>{
+  const register=async()=>{
     setErr('');
     if(!f.name||!f.email||!f.pw||!f.pw2){setErr('Please fill all required fields.');return;}
     if(!f.email.includes('@')||!f.email.includes('.')){setErr('Enter a valid email address.');return;}
     if(f.pw.length<6){setErr('Password must be at least 6 characters.');return;}
     if(f.pw!==f.pw2){setErr('Passwords do not match.');return;}
-    if(users.find(x=>x.email.toLowerCase()===f.email.toLowerCase())){setErr('An account with this email already exists.');return;}
-    const nu={id:uid(),name:f.name.trim(),email:f.email.trim(),password:f.pw,location:f.loc.trim()||'Earth 🌍',bio:f.bio.trim()||'New traveler ready to explore!',interests:[],joinedAt:new Date().toISOString()};
-    const updated=[...users,nu];
-    setUsers(updated);
-    LS.set('tb_users',updated);
-    onLogin(nu);
+    const res=await fetch('https://my-travel-buddy-kn22.onrender.com/api/auth/register',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({name:f.name.trim(),email:f.email.trim(),password:f.pw,location:f.loc.trim()||'Earth 🌍',bio:f.bio.trim()||'New traveler ready to explore!'})
+    });
+    const data=await res.json();
+    if(data.error){setErr(data.error);return;}
+    localStorage.setItem('tb_token',data.token);
+    onLogin(data.user);
   };
-const forgot = async () => {
-    setErr(''); setOk('');
-    if (!f.email) { setErr('Enter your email address.'); return; }
-    
-    const res = await fetch(
-        'https://my-travel-buddy-kn22.onrender.com/api/auth/forgot-password',
-        {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: f.email })
-        }
-    );
-    const data = await res.json();
-    if (data.error) { setErr(data.error); return; }
+  const forgot=async()=>{
+    setErr('');setOk('');
+    if(!f.email){setErr('Enter your email address.');return;}
+    const res=await fetch('https://my-travel-buddy-kn22.onrender.com/api/auth/forgot-password',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email:f.email})
+    });
+    const data=await res.json();
+    if(data.error){setErr(data.error);return;}
     setOk(data.message);
-};
+  };
 
   return(
     <div className="auth-wrap">
@@ -923,25 +928,43 @@ function AppShell({user,trips,users,onLogout,onUpdate,onJoin,onCreateTrip,onUpda
    ROOT APP — LOCALSTORAGE BACKED
 ══════════════════════════════ */
 function App(){
-  const [users,setUsers]=useState(()=>LS.get('tb_users',[]));
-  const [trips,setTrips]=useState(()=>LS.get('tb_trips',[]));
-  const [me,setMe]=useState(()=>{
-    const saved=LS.get('tb_session',null);
-    if(!saved)return null;
-    const all=LS.get('tb_users',[]);
-    return all.find(u=>u.id===saved)||null;
-  });
+  const [users,setUsers]=useState([]);
+  const [trips,setTrips]=useState([]);
+  const [me,setMe]=useState(null);
+  const [loading,setLoading]=useState(true);
+  const BASE='https://my-travel-buddy-kn22.onrender.com/api';
+  const getToken=()=>localStorage.getItem('tb_token');
+  const authHeaders=()=>({'Content-Type':'application/json','Authorization':'Bearer '+getToken()});
 
-  useEffect(()=>LS.set('tb_users',users),[users]);
-  useEffect(()=>LS.set('tb_trips',trips),[trips]);
-  useEffect(()=>LS.set('tb_session',me?.id||null),[me]);
+  useEffect(()=>{
+    const token=localStorage.getItem('tb_token');
+    if(!token){setLoading(false);return;}
+    fetch(BASE+'/users/me',{headers:authHeaders()})
+      .then(r=>r.json())
+      .then(data=>{
+        if(data.error){localStorage.removeItem('tb_token');setLoading(false);return;}
+        setMe(data);
+        loadTrips();
+        setLoading(false);
+      }).catch(()=>setLoading(false));
+  },[]);
 
-  const login=u=>{setMe(u);};
-  const logout=()=>{setMe(null);LS.set('tb_session',null);};
+  const loadTrips=async()=>{
+    const res=await fetch(BASE+'/trips/',{headers:authHeaders()});
+    const data=await res.json();
+    if(Array.isArray(data))setTrips(data);
+  };
 
-  const updateUser=u=>{
-    const updated=users.map(x=>x.id===u.id?u:x);
-    setUsers(updated);
+  const login=u=>{setMe(u);loadTrips();};
+  const logout=()=>{setMe(null);localStorage.removeItem('tb_token');setTrips([]);};
+
+  const updateUser=async(u)=>{
+    const res=await fetch('https://my-travel-buddy-kn22.onrender.com/api/users/me',{
+      method:'PUT',
+      headers:authHeaders(),
+      body:JSON.stringify(u)
+    });
+    await res.json();
     setMe(u);
   };
 
@@ -952,8 +975,15 @@ function App(){
     }));
   };
 
-  const createTrip=t=>{
-    setTrips(ts=>[...ts,t]);
+  const createTrip=async(t)=>{
+    const res=await fetch('https://my-travel-buddy-kn22.onrender.com/api/trips/',{
+      method:'POST',
+      headers:authHeaders(),
+      body:JSON.stringify(t)
+    });
+    const data=await res.json();
+    if(data.error){showToast(data.error);return;}
+    await loadTrips();
   };
 
   const updateTrip=t=>{
