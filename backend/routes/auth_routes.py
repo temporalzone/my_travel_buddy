@@ -1,10 +1,12 @@
 from flask import Blueprint, request, jsonify
 import bcrypt
 import uuid
+import os
 from database import get_db
 from helpers import create_token, now, send_reset_email, create_reset_token, verify_reset_token, FRONTEND_URL
 
 auth_bp = Blueprint("auth", __name__)
+ALLOW_RESET_LINK_FALLBACK = os.getenv("ALLOW_RESET_LINK_FALLBACK", "false").lower() == "true"
 
 @auth_bp.route("/register", methods=["POST"])
 def register():
@@ -122,12 +124,9 @@ def forgot_password():
     ).fetchone()
     conn.close()
 
-    print(f"Looking for email: {data['email'].lower().strip()}")
-    all_users = get_db().execute("SELECT email FROM users").fetchall()
-    print(f"All users in DB: {[u['email'] for u in all_users]}")
-
     if not user:
-        return jsonify({"error": "No account found with this email"}), 404
+        # Do not reveal whether an account exists for this email.
+        return jsonify({"message": "If that email exists, a reset link has been sent."}), 200
 
     reset_token = create_reset_token(data["email"].lower().strip())
     sent, send_message = send_reset_email(data["email"].lower().strip(), reset_token)
@@ -135,21 +134,22 @@ def forgot_password():
     if not sent:
         print(f"forgot-password send failure: {send_message}")
 
-        # Temporary fallback for environments where outbound mail is blocked.
-        # Must point to app root + reset_token query for GitHub Pages.
-        base_url = (FRONTEND_URL or "").rstrip("/")
-        if base_url.endswith("/my_travel_buddy"):
-            reset_link = f"{base_url}/?reset_token={reset_token}"
-        else:
-            reset_link = f"{base_url}/my_travel_buddy/?reset_token={reset_token}"
+        if ALLOW_RESET_LINK_FALLBACK:
+            # Optional fallback for controlled debugging only.
+            base_url = (FRONTEND_URL or "").rstrip("/")
+            if base_url.endswith("/my_travel_buddy"):
+                reset_link = f"{base_url}/?reset_token={reset_token}"
+            else:
+                reset_link = f"{base_url}/my_travel_buddy/?reset_token={reset_token}"
 
-        return jsonify({
-            "message": "Email delivery failed, but you can still reset using this link.",
-            "reset_link": reset_link,
-            "details": send_message
-        }), 200
+            return jsonify({
+                "message": "Email delivery failed, but you can still reset using this link.",
+                "reset_link": reset_link
+            }), 200
 
-    return jsonify({"message": "Password reset link sent to your email!"}), 200
+        return jsonify({"error": "Could not send email. Try again later."}), 500
+
+    return jsonify({"message": "If that email exists, a reset link has been sent."}), 200
 
 
 @auth_bp.route("/reset-password", methods=["POST"])
