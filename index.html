@@ -302,9 +302,20 @@ function AuthScreen({onLogin,users,setUsers}){
   const [tab,setTab]=useState('login');
   const [view,setView]=useState('auth');
   const [f,setF]=useState({name:'',email:'',pw:'',pw2:'',loc:'',bio:''});
+  const [resetPw,setResetPw]=useState('');
+  const [resetPw2,setResetPw2]=useState('');
   const [err,setErr]=useState('');
   const [ok,setOk]=useState('');
+  const resetToken = new URLSearchParams(window.location.search).get('reset_token');
   const s=(k,v)=>setF(p=>({...p,[k]:v}));
+
+  useEffect(()=>{
+    if(resetToken){
+      setView('reset');
+      setErr('');
+      setOk('');
+    }
+  },[resetToken]);
 
   const login=async()=>{
     setErr('');
@@ -377,6 +388,49 @@ function AuthScreen({onLogin,users,setUsers}){
     setErr(lastError);
   };
 
+  const resetPassword=async()=>{
+    setErr('');
+    setOk('');
+
+    if(!resetToken){
+      setErr('Invalid or missing reset token. Please request a new reset link.');
+      return;
+    }
+    if(!resetPw||!resetPw2){
+      setErr('Please fill both password fields.');
+      return;
+    }
+    if(resetPw.length<6){
+      setErr('Password must be at least 6 characters.');
+      return;
+    }
+    if(resetPw!==resetPw2){
+      setErr('Passwords do not match.');
+      return;
+    }
+
+    try{
+      const res=await fetch('https://my-travel-buddy-kn22.onrender.com/api/auth/reset-password',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({token:resetToken,new_password:resetPw})
+      });
+      const data=await res.json();
+      if(!res.ok||data.error){
+        setErr(data.error||'Failed to reset password.');
+        return;
+      }
+      setOk('Password reset successful. Please login with your new password.');
+      window.history.replaceState({},'',window.location.pathname);
+      setView('auth');
+      setTab('login');
+      setResetPw('');
+      setResetPw2('');
+    }catch(e){
+      setErr('Network error. Please try again.');
+    }
+  };
+
   return(
     <div className="auth-wrap">
       <div className="auth-panel">
@@ -397,7 +451,20 @@ function AuthScreen({onLogin,users,setUsers}){
       <div className="auth-form-wrap">
         <div className="auth-form fade-up">
           <Logo/>
-          {view==='forgot'?(
+          {view==='reset'?(
+            <>
+              <h2>Set New Password</h2>
+              <p className="sub">Enter your new password below.</p>
+              {err&&<div className="alert-err">{err}</div>}
+              {ok&&<div className="alert-ok">{ok}</div>}
+              <div className="field"><label>New Password</label><div className="field-wrap"><span className="ico">🔒</span><input type="password" placeholder="Min. 6 characters" value={resetPw} onChange={e=>setResetPw(e.target.value)}/></div></div>
+              <div className="field"><label>Confirm New Password</label><div className="field-wrap"><span className="ico">🔒</span><input type="password" placeholder="Repeat new password" value={resetPw2} onChange={e=>setResetPw2(e.target.value)} onKeyDown={e=>e.key==='Enter'&&resetPassword()}/></div></div>
+              <button className="btn btn-primary" style={{width:'100%',padding:'.78rem'}} onClick={resetPassword}>Reset Password</button>
+              <p style={{textAlign:'center',marginTop:'1rem',fontSize:'.83rem',color:'var(--muted)'}}>
+                <span className="auth-link" onClick={()=>{window.history.replaceState({},'',window.location.pathname);setView('auth');setErr('');setOk('');}}>← Back to login</span>
+              </p>
+            </>
+          ):(view==='forgot'?(
             <>
               <h2>Reset Password</h2>
               <p className="sub">Enter your email and we'll send a reset link.</p>
@@ -437,7 +504,7 @@ function AuthScreen({onLogin,users,setUsers}){
                 Don't have an account? <span className="auth-link" onClick={()=>{setTab('register');setErr('');}}>Register free</span>
               </p>}
             </>
-          )}
+          ))}
         </div>
       </div>
     </div>
