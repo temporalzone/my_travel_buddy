@@ -561,7 +561,7 @@ function TripCard({trip,user,onJoin,onOpen,joined,users,pending}){
 /* ══════════════════════════════
    DASHBOARD
 ══════════════════════════════ */
-function Dashboard({user,trips,users,onJoin,onOpen,setPage,pendingRequests,onApproveRequest}){
+function Dashboard({user,trips,users,onJoin,onOpen,setPage,pendingRequests,onApproveRequest,onRejectRequest}){
   const myTrips=trips.filter(t=>t.memberIds.includes(user.id));
   const openTrips=trips.filter(t=>!t.memberIds.includes(user.id)&&t.seats>0);
   const hostPending=(pendingRequests||[]);
@@ -597,7 +597,10 @@ function Dashboard({user,trips,users,onJoin,onOpen,setPage,pendingRequests,onApp
             <div key={r.id} style={{background:'#fff',border:'1px solid var(--border)',borderRadius:14,padding:'1rem'}}>
               <div style={{fontFamily:'Syne,sans-serif',fontWeight:800,fontSize:'.92rem',marginBottom:'.35rem'}}>{r.tripTitle}</div>
               <div style={{fontSize:'.82rem',color:'var(--muted)',marginBottom:'.7rem'}}>{r.requesterName} ({r.requesterEmail}) wants to join</div>
-              <button className="btn btn-emerald btn-sm" onClick={()=>onApproveRequest(r.id)}>✅ Approve</button>
+              <div style={{display:'flex',gap:'.45rem'}}>
+                <button className="btn btn-emerald btn-sm" onClick={()=>onApproveRequest(r.id)}>✅ Approve</button>
+                <button className="btn btn-danger btn-sm" onClick={()=>onRejectRequest(r.id)}>❌ Reject</button>
+              </div>
             </div>
           ))}
         </div>
@@ -948,7 +951,7 @@ function UserModal({uid_,users,onClose}){
 /* ══════════════════════════════
    APP SHELL
 ══════════════════════════════ */
-function AppShell({user,trips,users,onLogout,onUpdate,onJoin,onCreateTrip,onUpdateTrip,pendingRequests,onApproveRequest}){
+function AppShell({user,trips,users,onLogout,onUpdate,onJoin,onCreateTrip,onUpdateTrip,pendingRequests,onApproveRequest,onRejectRequest}){
   const [page,setPage]=useState('dashboard');
   const [openTripId,setOpenTripId]=useState(null);
   const [viewUid,setViewUid]=useState(null);
@@ -1022,7 +1025,7 @@ function AppShell({user,trips,users,onLogout,onUpdate,onJoin,onCreateTrip,onUpda
           </div>
         </div>
         <div className="main">
-          {page==='dashboard'&&<Dashboard user={user} trips={trips} users={users} onJoin={joinTrip} onOpen={openTrip} setPage={setPage} pendingRequests={pendingRequests} onApproveRequest={onApproveRequest}/>}
+          {page==='dashboard'&&<Dashboard user={user} trips={trips} users={users} onJoin={joinTrip} onOpen={openTrip} setPage={setPage} pendingRequests={pendingRequests} onApproveRequest={onApproveRequest} onRejectRequest={onRejectRequest}/>}
           {page==='explore'&&<ExplorePage trips={trips} user={user} users={users} onJoin={joinTrip} onOpen={openTrip}/>}
           {page==='create'&&<CreatePage user={user} onCreate={async t=>{const out=await onCreateTrip(t); if(out&&out.error){showToast(`❌ ${out.error}`);return;} showToast('🚀 Trip created! Others can now find and join it.');}} setPage={setPage}/>}
           {page==='profile'&&<ProfilePage user={user} onUpdate={onUpdate} onLogout={onLogout} showToast={showToast}/>}
@@ -1125,6 +1128,17 @@ function App(){
     return data;
   };
 
+  const rejectRequest=async(requestId)=>{
+    const res=await fetch(`${BASE}/trips/requests/${requestId}/reject`,{
+      method:'POST',
+      headers:authHeaders()
+    });
+    const data=await res.json();
+    await loadTrips();
+    await loadPendingRequests();
+    return data;
+  };
+
   const updateTrip=t=>{
     setTrips(ts=>ts.map(x=>x.id===t.id?t:x));
   };
@@ -1146,6 +1160,12 @@ function App(){
       pendingRequests={pendingRequests}
       onApproveRequest={async (rid)=>{
         const out=await approveRequest(rid);
+        if(out&&out.error){
+          alert(out.error);
+        }
+      }}
+      onRejectRequest={async (rid)=>{
+        const out=await rejectRequest(rid);
         if(out&&out.error){
           alert(out.error);
         }

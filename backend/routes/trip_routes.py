@@ -272,3 +272,39 @@ def approve_join_request(request_id):
     conn.close()
 
     return jsonify({"message": "Request approved. User added to the trip."}), 200
+
+
+@trip_bp.route("/requests/<request_id>/reject", methods=["POST"])
+def reject_join_request(request_id):
+    host_id = get_current_user()
+    if not host_id:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    conn = get_db()
+    row = conn.execute("""
+        SELECT jr.id, jr.status, t.host_id
+        FROM join_requests jr
+        JOIN trips t ON jr.trip_id = t.id
+        WHERE jr.id = ?
+    """, (request_id,)).fetchone()
+
+    if not row:
+        conn.close()
+        return jsonify({"error": "Request not found"}), 404
+
+    if row["host_id"] != host_id:
+        conn.close()
+        return jsonify({"error": "Only trip creator can reject"}), 403
+
+    if row["status"] != "pending":
+        conn.close()
+        return jsonify({"error": "Request already processed"}), 400
+
+    conn.execute(
+        "UPDATE join_requests SET status = 'rejected', reviewed_at = ? WHERE id = ?",
+        (now(), request_id)
+    )
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "Request rejected."}), 200
