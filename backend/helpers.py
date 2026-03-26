@@ -220,3 +220,55 @@ def send_join_request_email(host_email, host_name, trip_title, requester_name, r
         return True, "Join request email sent via Gmail"
     except Exception as e:
         return False, f"Join request email failed: {str(e)}"
+
+
+def send_registration_otp_email(to_email, otp_code):
+    """Send OTP email for new user registration verification."""
+    import smtplib
+    from email.mime.multipart import MIMEMultipart
+    from email.mime.text import MIMEText
+
+    html = f"""
+    <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:2rem;">
+        <h2 style="color:#0EA5E9">Travel Buddy 🌍</h2>
+        <p>Your registration verification code is:</p>
+        <div style="font-size:2rem;font-weight:800;letter-spacing:6px;color:#0F172A;margin:1rem 0;">{otp_code}</div>
+        <p>This code expires in 10 minutes.</p>
+        <p style="color:#64748B;font-size:0.9rem;">If you did not request this, please ignore this email.</p>
+    </div>
+    """
+
+    try:
+        if SENDGRID_API_KEY and FROM_EMAIL:
+            sg = SendGridAPIClient(SENDGRID_API_KEY)
+            email = Mail(
+                from_email=FROM_EMAIL,
+                to_emails=to_email,
+                subject="Travel Buddy - Verify Your Email",
+                html_content=html
+            )
+            response = sg.send(email)
+            if getattr(response, "status_code", None) in (200, 202):
+                return True, "OTP sent via SendGrid"
+    except Exception as e:
+        print(f"Registration OTP SendGrid exception: {str(e)}")
+
+    gmail_user = os.getenv("GMAIL_USER")
+    gmail_pass = os.getenv("GMAIL_APP_PASSWORD")
+    if not gmail_user or not gmail_pass:
+        return False, "OTP email failed (no email provider available)"
+
+    msg = MIMEMultipart('alternative')
+    msg['Subject'] = "Travel Buddy - Verify Your Email"
+    msg['From'] = gmail_user
+    msg['To'] = to_email
+    msg.attach(MIMEText(html, 'html'))
+
+    try:
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=20)
+        server.login(gmail_user, gmail_pass)
+        server.sendmail(gmail_user, to_email, msg.as_string())
+        server.quit()
+        return True, "OTP sent via Gmail"
+    except Exception as e:
+        return False, f"OTP email failed: {str(e)}"

@@ -11,6 +11,11 @@ def init_db():
     conn = get_db()
     cur = conn.cursor()
 
+    def ensure_column(table, column, definition):
+        cols = [r[1] for r in cur.execute(f"PRAGMA table_info({table})").fetchall()]
+        if column not in cols:
+            cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
     cur.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id          TEXT PRIMARY KEY,
@@ -23,6 +28,10 @@ def init_db():
             joined_at   TEXT NOT NULL
         )
     """)
+
+    ensure_column("users", "age", "INTEGER")
+    ensure_column("users", "gender", "TEXT")
+    ensure_column("users", "profile_picture", "TEXT")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS trips (
@@ -58,6 +67,17 @@ def init_db():
             user_id  TEXT NOT NULL,
             text     TEXT NOT NULL,
             sent_at  TEXT NOT NULL
+        )
+    """)
+
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS email_otps (
+            id         TEXT PRIMARY KEY,
+            email      TEXT NOT NULL,
+            otp_code   TEXT NOT NULL,
+            payload    TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            created_at TEXT NOT NULL
         )
     """)
 

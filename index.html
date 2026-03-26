@@ -301,7 +301,9 @@ function Toast({msg,onDone}){
 function AuthScreen({onLogin,users,setUsers}){
   const [tab,setTab]=useState('login');
   const [view,setView]=useState('auth');
-  const [f,setF]=useState({name:'',email:'',pw:'',pw2:'',loc:'',bio:''});
+  const [f,setF]=useState({name:'',email:'',pw:'',pw2:'',loc:'',bio:'',age:'',gender:'Prefer not to say',photo:''});
+  const [otp,setOtp]=useState('');
+  const [otpEmail,setOtpEmail]=useState('');
   const [resetPw,setResetPw]=useState('');
   const [resetPw2,setResetPw2]=useState('');
   const [err,setErr]=useState('');
@@ -336,10 +338,36 @@ function AuthScreen({onLogin,users,setUsers}){
     if(!f.email.includes('@')||!f.email.includes('.')){setErr('Enter a valid email address.');return;}
     if(f.pw.length<6){setErr('Password must be at least 6 characters.');return;}
     if(f.pw!==f.pw2){setErr('Passwords do not match.');return;}
-    const res=await fetch('https://my-travel-buddy-kn22.onrender.com/api/auth/register',{
+    const ageNum=f.age?parseInt(f.age,10):null;
+    if(f.age && (isNaN(ageNum) || ageNum<13 || ageNum>100)){setErr('Age should be between 13 and 100.');return;}
+    const res=await fetch('https://my-travel-buddy-kn22.onrender.com/api/auth/request-register-otp',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({name:f.name.trim(),email:f.email.trim(),password:f.pw,location:f.loc.trim()||'Earth 🌍',bio:f.bio.trim()||'New traveler ready to explore!'})
+      body:JSON.stringify({
+        name:f.name.trim(),
+        email:f.email.trim(),
+        password:f.pw,
+        location:f.loc.trim()||'Earth 🌍',
+        bio:f.bio.trim()||'New traveler ready to explore!',
+        age:ageNum,
+        gender:f.gender,
+        profile_picture:f.photo.trim()||null
+      })
+    });
+    const data=await res.json();
+    if(data.error){setErr(data.error);return;}
+    setOtpEmail(f.email.trim().toLowerCase());
+    setView('verifyOtp');
+    setOk('OTP sent to your email. Enter it below to verify your account.');
+  };
+
+  const verifyRegisterOtp=async()=>{
+    setErr('');
+    if(!otp||otp.length!==6){setErr('Enter 6-digit OTP.');return;}
+    const res=await fetch('https://my-travel-buddy-kn22.onrender.com/api/auth/verify-register-otp',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email:otpEmail,otp})
     });
     const data=await res.json();
     if(data.error){setErr(data.error);return;}
@@ -476,6 +504,18 @@ function AuthScreen({onLogin,users,setUsers}){
                 <span className="auth-link" onClick={()=>{setView('auth');setErr('');setOk('');}}>← Back to login</span>
               </p>
             </>
+          ):(view==='verifyOtp'?(
+            <>
+              <h2>Verify Email OTP</h2>
+              <p className="sub">We sent a 6-digit OTP to <strong>{otpEmail}</strong></p>
+              {err&&<div className="alert-err">{err}</div>}
+              {ok&&<div className="alert-ok">{ok}</div>}
+              <div className="field"><label>OTP Code</label><div className="field-wrap"><span className="ico">🔐</span><input type="text" placeholder="Enter 6-digit OTP" value={otp} onChange={e=>setOtp(e.target.value.replace(/\D/g,'').slice(0,6))} onKeyDown={e=>e.key==='Enter'&&verifyRegisterOtp()}/></div></div>
+              <button className="btn btn-primary" style={{width:'100%',padding:'.78rem'}} onClick={verifyRegisterOtp}>Verify & Create Account</button>
+              <p style={{textAlign:'center',marginTop:'1rem',fontSize:'.83rem',color:'var(--muted)'}}>
+                <span className="auth-link" onClick={()=>{setView('auth');setTab('register');setErr('');setOk('');}}>← Back to register</span>
+              </p>
+            </>
           ):(
             <>
               <h2>{tab==='login'?'Welcome back 👋':'Join Travel Buddy 🚀'}</h2>
@@ -493,7 +533,12 @@ function AuthScreen({onLogin,users,setUsers}){
               {tab==='register'&&<>
                 <div className="field"><label>Confirm Password *</label><div className="field-wrap"><span className="ico">🔒</span><input type="password" placeholder="Repeat your password" value={f.pw2} onChange={e=>s('pw2',e.target.value)}/></div></div>
                 <div className="divider">optional details</div>
+                <div className="field-row">
+                  <div className="field"><label>Age</label><div className="field-wrap"><span className="ico">🎂</span><input type="number" min="13" max="100" placeholder="e.g. 24" value={f.age} onChange={e=>s('age',e.target.value)}/></div></div>
+                  <div className="field"><label>Gender</label><select value={f.gender} onChange={e=>s('gender',e.target.value)}><option>Prefer not to say</option><option>Male</option><option>Female</option><option>Non-binary</option><option>Other</option></select></div>
+                </div>
                 <div className="field"><label>Location</label><div className="field-wrap"><span className="ico">📍</span><input placeholder="City, Country" value={f.loc} onChange={e=>s('loc',e.target.value)}/></div></div>
+                <div className="field"><label>Profile Picture URL</label><div className="field-wrap"><span className="ico">🖼️</span><input placeholder="https://..." value={f.photo} onChange={e=>s('photo',e.target.value)}/></div></div>
                 <div className="field"><label>Bio</label><textarea className="field" placeholder="Tell fellow travelers about yourself..." value={f.bio} onChange={e=>s('bio',e.target.value)} style={{padding:'.65rem .95rem',border:'1.5px solid var(--border)',borderRadius:10,fontFamily:'Nunito,sans-serif',fontSize:'.9rem',width:'100%',outline:'none',resize:'vertical',minHeight:76}}/></div>
               </>}
               {tab==='login'&&<div style={{textAlign:'right',marginBottom:'.85rem'}}><span className="auth-link" onClick={()=>{setView('forgot');setErr('');setOk('');}}>Forgot password?</span></div>}
@@ -504,7 +549,7 @@ function AuthScreen({onLogin,users,setUsers}){
                 Don't have an account? <span className="auth-link" onClick={()=>{setTab('register');setErr('');}}>Register free</span>
               </p>}
             </>
-          ))}
+          ))) }
         </div>
       </div>
     </div>
@@ -834,7 +879,7 @@ function CreatePage({user,onCreate,setPage}){
 ══════════════════════════════ */
 function ProfilePage({user,onUpdate,onLogout,showToast}){
   const [editing,setEditing]=useState(false);
-  const [f,setF]=useState({name:user.name,email:user.email,loc:user.location,bio:user.bio,interests:(user.interests||[]).join(', ')});
+  const [f,setF]=useState({name:user.name,email:user.email,loc:user.location,bio:user.bio,interests:(user.interests||[]).join(', '),age:user.age||'',gender:user.gender||'Prefer not to say',photo:user.profile_picture||''});
   const [pw,setPw]=useState({old:'',n1:'',n2:''});
   const [pwErr,setPwErr]=useState('');
   const [pwOk,setPwOk]=useState('');
@@ -844,7 +889,9 @@ function ProfilePage({user,onUpdate,onLogout,showToast}){
   const save=()=>{
     if(!f.name.trim()||!f.email.trim()){showToast('Name and email are required.');return;}
     if(!f.email.includes('@')){showToast('Enter a valid email.');return;}
-    onUpdate({...user,name:f.name.trim(),email:f.email.trim(),location:f.loc.trim(),bio:f.bio.trim(),interests:f.interests.split(',').map(i=>i.trim()).filter(Boolean)});
+    const ageNum=f.age?parseInt(f.age,10):null;
+    if(f.age && (isNaN(ageNum)||ageNum<13||ageNum>100)){showToast('Age should be between 13 and 100.');return;}
+    onUpdate({...user,name:f.name.trim(),email:f.email.trim(),location:f.loc.trim(),bio:f.bio.trim(),interests:f.interests.split(',').map(i=>i.trim()).filter(Boolean),age:ageNum,gender:f.gender,profile_picture:f.photo.trim()||null});
     setEditing(false);
     showToast('✅ Profile updated!');
   };
@@ -886,6 +933,11 @@ function ProfilePage({user,onUpdate,onLogout,showToast}){
             <div className="field"><label>Full Name *</label><div className="field-wrap"><span className="ico">👤</span><input value={f.name} onChange={e=>s('name',e.target.value)}/></div></div>
             <div className="field"><label>Email *</label><div className="field-wrap"><span className="ico">📧</span><input value={f.email} onChange={e=>s('email',e.target.value)}/></div></div>
             <div className="field"><label>Location</label><div className="field-wrap"><span className="ico">📍</span><input value={f.loc} onChange={e=>s('loc',e.target.value)}/></div></div>
+            <div className="field-row">
+              <div className="field"><label>Age</label><div className="field-wrap"><span className="ico">🎂</span><input type="number" min="13" max="100" value={f.age} onChange={e=>s('age',e.target.value)}/></div></div>
+              <div className="field"><label>Gender</label><select value={f.gender} onChange={e=>s('gender',e.target.value)}><option>Prefer not to say</option><option>Male</option><option>Female</option><option>Non-binary</option><option>Other</option></select></div>
+            </div>
+            <div className="field"><label>Profile Picture URL</label><div className="field-wrap"><span className="ico">🖼️</span><input value={f.photo} onChange={e=>s('photo',e.target.value)} placeholder="https://..."/></div></div>
             <div className="field"><label>Bio</label><textarea style={{padding:'.65rem .95rem',border:'1.5px solid var(--border)',borderRadius:10,fontFamily:'Nunito,sans-serif',fontSize:'.88rem',width:'100%',outline:'none',resize:'vertical',minHeight:76}} value={f.bio} onChange={e=>s('bio',e.target.value)}/></div>
             <div className="field"><label>Interests (comma separated)</label><div className="field-wrap"><span className="ico">🏷️</span><input placeholder="e.g. Hiking, Photography, Food" value={f.interests} onChange={e=>s('interests',e.target.value)}/></div></div>
             <div style={{display:'flex',gap:'.55rem'}}>
@@ -894,7 +946,7 @@ function ProfilePage({user,onUpdate,onLogout,showToast}){
             </div>
           </>
         ):(
-          [['👤 Name',user.name],['📧 Email',user.email],['📍 Location',user.location],['✏️ Bio',user.bio||'Not set']].map(([l,v])=>(
+          [['👤 Name',user.name],['📧 Email',user.email],['📍 Location',user.location],['🎂 Age',user.age||'Not set'],['⚧ Gender',user.gender||'Not set'],['✏️ Bio',user.bio||'Not set']].map(([l,v])=>(
             <div key={l} className="info-row"><span className="info-lbl">{l}</span><span className="info-val">{v}</span></div>
           ))
         )}

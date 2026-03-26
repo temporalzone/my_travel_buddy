@@ -27,7 +27,10 @@ def get_me():
         "location":  user["location"],
         "bio":       user["bio"],
         "interests": user["interests"].split(",") if user["interests"] else [],
-        "joined_at": user["joined_at"]
+        "joined_at": user["joined_at"],
+        "age":       user["age"],
+        "gender":    user["gender"],
+        "profile_picture": user["profile_picture"]
     }), 200
 
 
@@ -45,7 +48,7 @@ def update_profile():
     conn = get_db()
     conn.execute("""
         UPDATE users
-        SET name = ?, email = ?, location = ?, bio = ?, interests = ?
+        SET name = ?, email = ?, location = ?, bio = ?, interests = ?, age = ?, gender = ?, profile_picture = ?
         WHERE id = ?
     """, (
         data["name"].strip(),
@@ -53,6 +56,9 @@ def update_profile():
         data.get("location", ""),
         data.get("bio", ""),
         ",".join(data.get("interests", [])),
+        data.get("age"),
+        data.get("gender"),
+        data.get("profile_picture"),
         user_id
     ))
     conn.commit()
@@ -117,5 +123,8 @@ def get_user_profile(user_id):
         "name":      user["name"],
         "location":  user["location"],
         "bio":       user["bio"],
-        "interests": user["interests"].split(",") if user["interests"] else []
+        "interests": user["interests"].split(",") if user["interests"] else [],
+        "age":       user["age"],
+        "gender":    user["gender"],
+        "profile_picture": user["profile_picture"]
     }), 200
