@@ -62,8 +62,12 @@ def send_reset_email(to_email, reset_token):
     from email.mime.multipart import MIMEMultipart
     from email.mime.text import MIMEText
 
-    # Build correct reset link
-    reset_link = f"{FRONTEND_URL}/my_travel_buddy/reset-password?token={reset_token}"
+    # Build reset link safely (avoid accidental double /my_travel_buddy)
+    base_url = (FRONTEND_URL or "").rstrip("/")
+    if base_url.endswith("/my_travel_buddy"):
+        reset_link = f"{base_url}/reset-password?token={reset_token}"
+    else:
+        reset_link = f"{base_url}/my_travel_buddy/reset-password?token={reset_token}"
 
     html = f"""
     <div style="font-family:sans-serif;max-width:500px;margin:0 auto;padding:2rem;">
@@ -83,18 +87,28 @@ def send_reset_email(to_email, reset_token):
 
     # Try SendGrid first
     try:
-        sg = SendGridAPIClient(SENDGRID_API_KEY)
-        email = Mail(
-            from_email=FROM_EMAIL,
-            to_emails=to_email,
-            subject="Travel Buddy — Reset Your Password",
-            html_content=html
-        )
-        response = sg.send(email)
-        print(f"Email sent via SendGrid to {to_email}")
-        return True
+        if SENDGRID_API_KEY and FROM_EMAIL:
+            sg = SendGridAPIClient(SENDGRID_API_KEY)
+            email = Mail(
+                from_email=FROM_EMAIL,
+                to_emails=to_email,
+                subject="Travel Buddy — Reset Your Password",
+                html_content=html
+            )
+            response = sg.send(email)
+            status = getattr(response, "status_code", None)
+            if status in (200, 202):
+                print(f"Email sent via SendGrid to {to_email} (status={status})")
+                return True
+
+            body = getattr(response, "body", b"")
+            if isinstance(body, bytes):
+                body = body.decode("utf-8", errors="ignore")
+            print(f"SendGrid failed with status={status}, body={body}")
+        else:
+            print("SendGrid skipped: SENDGRID_API_KEY or SENDGRID_FROM_EMAIL missing")
     except Exception as e:
-        print(f"SendGrid failed: {str(e)}")
+        print(f"SendGrid exception: {str(e)}")
 
     # Fallback to Gmail SMTP
     GMAIL = os.getenv("GMAIL_USER")
@@ -110,13 +124,28 @@ def send_reset_email(to_email, reset_token):
     msg['To'] = to_email
     msg.attach(MIMEText(html, 'html'))
 
+    # Fallback attempt 1: SSL (port 465)
     try:
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465)
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=20)
         server.login(GMAIL, GMAIL_PASS)
         server.sendmail(GMAIL, to_email, msg.as_string())
         server.quit()
-        print(f"Email sent via Gmail to {to_email}")
+        print(f"Email sent via Gmail SSL to {to_email}")
         return True
     except Exception as e:
-        print(f"Gmail error: {str(e)}")
+        print(f"Gmail SSL error: {str(e)}")
+
+    # Fallback attempt 2: STARTTLS (port 587)
+    try:
+        server = smtplib.SMTP('smtp.gmail.com', 587, timeout=20)
+        server.ehlo()
+        server.starttls()
+        server.ehlo()
+        server.login(GMAIL, GMAIL_PASS)
+        server.sendmail(GMAIL, to_email, msg.as_string())
+        server.quit()
+        print(f"Email sent via Gmail STARTTLS to {to_email}")
+        return True
+    except Exception as e:
+        print(f"Gmail STARTTLS error: {str(e)}")
         return False
