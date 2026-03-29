@@ -2,17 +2,18 @@ import os
 import sqlite3
 import importlib
 
-psycopg2 = None
-RealDictCursor = None
-try:
-    psycopg2 = importlib.import_module("psycopg2")
-    RealDictCursor = importlib.import_module("psycopg2.extras").RealDictCursor
-except Exception:
-    pass
-
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 USE_POSTGRES = bool(DATABASE_URL)
+
+
+def _load_postgres_driver():
+    try:
+        psycopg2 = importlib.import_module("psycopg2")
+        dict_cursor = importlib.import_module("psycopg2.extras").RealDictCursor
+        return psycopg2, dict_cursor
+    except Exception as e:
+        raise RuntimeError(f"DATABASE_URL is set but psycopg2 import failed: {e}")
 
 
 def _resolve_db_name():
@@ -32,11 +33,12 @@ def _convert_sql(sql):
 
 
 class PgCompatConn:
-    def __init__(self, raw_conn):
+    def __init__(self, raw_conn, dict_cursor):
         self._raw_conn = raw_conn
+        self._dict_cursor = dict_cursor
 
     def execute(self, sql, params=()):
-        cur = self._raw_conn.cursor(cursor_factory=RealDictCursor)
+        cur = self._raw_conn.cursor(cursor_factory=self._dict_cursor)
         cur.execute(_convert_sql(sql), params)
         return cur
 
@@ -54,9 +56,8 @@ def _ensure_db_dir(path):
 
 def get_db():
     if USE_POSTGRES:
-        if not psycopg2:
-            raise RuntimeError("DATABASE_URL is set but psycopg2 is not installed")
-        return PgCompatConn(psycopg2.connect(DATABASE_URL))
+        psycopg2, dict_cursor = _load_postgres_driver()
+        return PgCompatConn(psycopg2.connect(DATABASE_URL), dict_cursor)
 
     _ensure_db_dir(DB_NAME)
     conn = sqlite3.connect(DB_NAME)
