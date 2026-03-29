@@ -1,5 +1,18 @@
 import os
 import sqlite3
+import importlib
+
+psycopg2 = None
+RealDictCursor = None
+try:
+    psycopg2 = importlib.import_module("psycopg2")
+    RealDictCursor = importlib.import_module("psycopg2.extras").RealDictCursor
+except Exception:
+    pass
+
+
+DATABASE_URL = os.getenv("DATABASE_URL")
+USE_POSTGRES = bool(DATABASE_URL)
 
 
 def _resolve_db_name():
@@ -13,12 +26,38 @@ def _resolve_db_name():
 DB_NAME = _resolve_db_name()
 
 
+def _convert_sql(sql):
+    # Convert sqlite-style placeholders to postgres placeholders.
+    return sql.replace("?", "%s")
+
+
+class PgCompatConn:
+    def __init__(self, raw_conn):
+        self._raw_conn = raw_conn
+
+    def execute(self, sql, params=()):
+        cur = self._raw_conn.cursor(cursor_factory=RealDictCursor)
+        cur.execute(_convert_sql(sql), params)
+        return cur
+
+    def commit(self):
+        self._raw_conn.commit()
+
+    def close(self):
+        self._raw_conn.close()
+
+
 def _ensure_db_dir(path):
     folder = os.path.dirname(path)
     if folder:
         os.makedirs(folder, exist_ok=True)
 
 def get_db():
+    if USE_POSTGRES:
+        if not psycopg2:
+            raise RuntimeError("DATABASE_URL is set but psycopg2 is not installed")
+        return PgCompatConn(psycopg2.connect(DATABASE_URL))
+
     _ensure_db_dir(DB_NAME)
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
@@ -26,14 +65,25 @@ def get_db():
 
 def init_db():
     conn = get_db()
-    cur = conn.cursor()
 
     def ensure_column(table, column, definition):
-        cols = [r[1] for r in cur.execute(f"PRAGMA table_info({table})").fetchall()]
-        if column not in cols:
-            cur.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+        if USE_POSTGRES:
+            exists = conn.execute(
+                """
+                SELECT 1
+                FROM information_schema.columns
+                WHERE table_schema = 'public' AND table_name = ? AND column_name = ?
+                """,
+                (table, column),
+            ).fetchone()
+            if not exists:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {definition}")
+        else:
+            cols = [r[1] for r in conn.execute(f"PRAGMA table_info({table})").fetchall()]
+            if column not in cols:
+                conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
-    cur.execute("""
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS users (
             id          TEXT PRIMARY KEY,
             name        TEXT NOT NULL,
@@ -52,7 +102,7 @@ def init_db():
     ensure_column("users", "is_deleted", "INTEGER DEFAULT 0")
     ensure_column("users", "deleted_at", "TEXT")
 
-    cur.execute("""
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS trips (
             id          TEXT PRIMARY KEY,
             title       TEXT NOT NULL,
@@ -70,7 +120,7 @@ def init_db():
         )
     """)
 
-    cur.execute("""
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS trip_members (
             trip_id   TEXT NOT NULL,
             user_id   TEXT NOT NULL,
@@ -79,7 +129,7 @@ def init_db():
         )
     """)
 
-    cur.execute("""
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS messages (
             id       TEXT PRIMARY KEY,
             trip_id  TEXT NOT NULL,
@@ -91,7 +141,7 @@ def init_db():
 
     ensure_column("messages", "mentions", "TEXT")
 
-    cur.execute("""
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS read_receipts (
             id         TEXT PRIMARY KEY,
             message_id TEXT NOT NULL,
@@ -101,7 +151,7 @@ def init_db():
         )
     """)
 
-    cur.execute("""
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS message_reactions (
             id         TEXT PRIMARY KEY,
             message_id TEXT NOT NULL,
@@ -112,7 +162,7 @@ def init_db():
         )
     """)
 
-    cur.execute("""
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS message_files (
             id         TEXT PRIMARY KEY,
             message_id TEXT NOT NULL,
@@ -123,7 +173,7 @@ def init_db():
         )
     """)
 
-    cur.execute("""
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS typing_status (
             user_id    TEXT NOT NULL,
             trip_id    TEXT NOT NULL,
@@ -132,7 +182,7 @@ def init_db():
         )
     """)
 
-    cur.execute("""
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS email_otps (
             id         TEXT PRIMARY KEY,
             email      TEXT NOT NULL,
@@ -143,7 +193,7 @@ def init_db():
         )
     """)
 
-    cur.execute("""
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS join_requests (
             id           TEXT PRIMARY KEY,
             trip_id      TEXT NOT NULL,

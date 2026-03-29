@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 import uuid
+from datetime import datetime, timedelta
 from database import get_db
 from helpers import get_current_user, now
 
@@ -164,8 +165,10 @@ def mark_message_read(trip_id, message_id):
 
     conn.execute(
         """
-        INSERT OR REPLACE INTO read_receipts (id, message_id, user_id, read_at)
+        INSERT INTO read_receipts (id, message_id, user_id, read_at)
         VALUES (?, ?, ?, ?)
+        ON CONFLICT (message_id, user_id)
+        DO UPDATE SET id = excluded.id, read_at = excluded.read_at
         """,
         (receipt_id, message_id, user_id, read_at),
     )
@@ -195,8 +198,10 @@ def react_to_message(trip_id, message_id):
 
     conn.execute(
         """
-        INSERT OR REPLACE INTO message_reactions (id, message_id, user_id, emoji, reacted_at)
+        INSERT INTO message_reactions (id, message_id, user_id, emoji, reacted_at)
         VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT (message_id, user_id, emoji)
+        DO UPDATE SET id = excluded.id, reacted_at = excluded.reacted_at
         """,
         (reaction_id, message_id, user_id, emoji, reacted_at),
     )
@@ -248,8 +253,10 @@ def set_typing_status(trip_id):
 
     conn.execute(
         """
-        INSERT OR REPLACE INTO typing_status (user_id, trip_id, typing_at)
+        INSERT INTO typing_status (user_id, trip_id, typing_at)
         VALUES (?, ?, ?)
+        ON CONFLICT (user_id, trip_id)
+        DO UPDATE SET typing_at = excluded.typing_at
         """,
         (user_id, trip_id, now()),
     )
@@ -271,19 +278,28 @@ def get_typing_status(trip_id):
         conn.close()
         return jsonify({"error": "Not a member"}), 403
 
-    typing = conn.execute(
+    typing_rows = conn.execute(
         """
-        SELECT u.id, u.name
+        SELECT u.id, u.name, t.typing_at
         FROM typing_status t
         JOIN users u ON t.user_id = u.id
         WHERE t.trip_id = ?
           AND t.user_id != ?
-          AND datetime(t.typing_at) > datetime('now', '-3 seconds')
         """,
         (trip_id, user_id),
     ).fetchall()
 
     conn.close()
+
+    threshold = datetime.utcnow() - timedelta(seconds=3)
+    typing = []
+    for t in typing_rows:
+        try:
+            ts = datetime.fromisoformat(t["typing_at"])
+        except Exception:
+            continue
+        if ts > threshold:
+            typing.append(t)
 
     return jsonify([
         {
