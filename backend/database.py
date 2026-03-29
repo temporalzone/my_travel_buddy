@@ -1,6 +1,8 @@
 import os
 import sqlite3
 import importlib
+import socket
+from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
 
 
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -38,6 +40,42 @@ def _resolve_db_name():
 DB_NAME = _resolve_db_name()
 
 
+def _inject_hostaddr_ipv4(db_url):
+    """Return a DATABASE_URL with hostaddr=<ipv4> for libpq IPv4 fallback."""
+    parsed = urlparse(db_url)
+    host = parsed.hostname
+    port = parsed.port or 5432
+    if not host:
+        return None
+
+    query_items = dict(parse_qsl(parsed.query, keep_blank_values=True))
+    if "hostaddr" in query_items:
+        return db_url
+
+    try:
+        infos = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
+    except Exception:
+        return None
+
+    if not infos:
+        return None
+
+    ipv4 = infos[0][4][0]
+    query_items["hostaddr"] = ipv4
+    query_items.setdefault("sslmode", "require")
+
+    return urlunparse(
+        (
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            parsed.params,
+            urlencode(query_items),
+            parsed.fragment,
+        )
+    )
+
+
 def _convert_sql(sql):
     # Convert sqlite-style placeholders to postgres placeholders.
     return sql.replace("?", "%s")
@@ -72,7 +110,17 @@ def _ensure_db_dir(path):
 def get_db():
     if USE_POSTGRES:
         driver_kind, driver_module, row_helper = _load_postgres_driver()
-        return PgCompatConn(driver_module.connect(DATABASE_URL), driver_kind, row_helper)
+        try:
+            return PgCompatConn(driver_module.connect(DATABASE_URL), driver_kind, row_helper)
+        except Exception as e:
+            err = str(e)
+            # Supabase direct host can resolve to IPv6 first in some environments.
+            # Retry once with hostaddr=<ipv4> so connection uses IPv4 transport.
+            if "Network is unreachable" in err or "connection is bad" in err:
+                ipv4_url = _inject_hostaddr_ipv4(DATABASE_URL)
+                if ipv4_url and ipv4_url != DATABASE_URL:
+                    return PgCompatConn(driver_module.connect(ipv4_url), driver_kind, row_helper)
+            raise
 
     _ensure_db_dir(DB_NAME)
     conn = sqlite3.connect(DB_NAME)
