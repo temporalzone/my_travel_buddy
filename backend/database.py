@@ -8,12 +8,23 @@ USE_POSTGRES = bool(DATABASE_URL)
 
 
 def _load_postgres_driver():
+    psycopg2_error = None
     try:
         psycopg2 = importlib.import_module("psycopg2")
         dict_cursor = importlib.import_module("psycopg2.extras").RealDictCursor
-        return psycopg2, dict_cursor
+        return "psycopg2", psycopg2, dict_cursor
     except Exception as e:
-        raise RuntimeError(f"DATABASE_URL is set but psycopg2 import failed: {e}")
+        psycopg2_error = str(e)
+
+    try:
+        psycopg = importlib.import_module("psycopg")
+        dict_row = importlib.import_module("psycopg.rows").dict_row
+        return "psycopg3", psycopg, dict_row
+    except Exception as e:
+        raise RuntimeError(
+            "DATABASE_URL is set but no PostgreSQL driver could be loaded. "
+            f"psycopg2 error: {psycopg2_error}; psycopg error: {e}"
+        )
 
 
 def _resolve_db_name():
@@ -33,12 +44,16 @@ def _convert_sql(sql):
 
 
 class PgCompatConn:
-    def __init__(self, raw_conn, dict_cursor):
+    def __init__(self, raw_conn, driver_kind, row_helper):
         self._raw_conn = raw_conn
-        self._dict_cursor = dict_cursor
+        self._driver_kind = driver_kind
+        self._row_helper = row_helper
 
     def execute(self, sql, params=()):
-        cur = self._raw_conn.cursor(cursor_factory=self._dict_cursor)
+        if self._driver_kind == "psycopg2":
+            cur = self._raw_conn.cursor(cursor_factory=self._row_helper)
+        else:
+            cur = self._raw_conn.cursor(row_factory=self._row_helper)
         cur.execute(_convert_sql(sql), params)
         return cur
 
@@ -56,8 +71,8 @@ def _ensure_db_dir(path):
 
 def get_db():
     if USE_POSTGRES:
-        psycopg2, dict_cursor = _load_postgres_driver()
-        return PgCompatConn(psycopg2.connect(DATABASE_URL), dict_cursor)
+        driver_kind, driver_module, row_helper = _load_postgres_driver()
+        return PgCompatConn(driver_module.connect(DATABASE_URL), driver_kind, row_helper)
 
     _ensure_db_dir(DB_NAME)
     conn = sqlite3.connect(DB_NAME)
