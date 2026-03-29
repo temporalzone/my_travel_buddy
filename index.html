@@ -934,13 +934,28 @@ function ChatPage({trip,user,users,allTrips,onBack,onViewUser,onUpdateTrip}){
     }
   };
 
-  const deleteMessage=async(messageId)=>{
-    const ok=window.confirm('Delete this message? This cannot be undone.');
-    if(!ok)return;
+  const deleteMessage=async(messageId,isMine)=>{
+    let mode='me';
+    if(isMine){
+      const choice=window.prompt("Type 'me' to hide for yourself, or 'everyone' to delete for all members.","me");
+      if(choice===null)return;
+      mode=(choice||'').trim().toLowerCase();
+      if(mode!=='me'&&mode!=='everyone'){
+        alert("Invalid choice. Type exactly 'me' or 'everyone'.");
+        return;
+      }
+      const ok=window.confirm(mode==='everyone'?'Delete for everyone? This cannot be undone.':'Hide this message only for you?');
+      if(!ok)return;
+    }else{
+      const ok=window.confirm('Hide this message only for you?');
+      if(!ok)return;
+      mode='me';
+    }
     try{
       const res=await fetch(`${MSG_BASE}/${trip.id}/messages/${messageId}`,{
         method:'DELETE',
-        headers:auth()
+        headers:auth(),
+        body:JSON.stringify({mode})
       });
       const data=await res.json();
       if(!res.ok||data.error){
@@ -1010,11 +1025,9 @@ function ChatPage({trip,user,users,allTrips,onBack,onViewUser,onUpdateTrip}){
                             {m.readCount&&m.readCount>1?'✓✓':'✓'}
                           </span>
                         )}
-                        {mine&&(
-                          <button className="btn btn-xs btn-outline" style={{marginLeft:'.45rem',padding:'.12rem .45rem'}} onClick={()=>deleteMessage(m.id)}>
-                            Delete
-                          </button>
-                        )}
+                        <button className="btn btn-xs btn-outline" style={{marginLeft:'.45rem',padding:'.12rem .45rem'}} onClick={()=>deleteMessage(m.id,mine)}>
+                          {mine?'Delete':'Hide'}
+                        </button>
                       </div>
                       
                       {/* Reactions Row */}

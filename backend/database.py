@@ -275,6 +275,15 @@ def init_db():
     """)
 
     conn.execute("""
+        CREATE TABLE IF NOT EXISTS message_hidden (
+            user_id    TEXT NOT NULL,
+            message_id TEXT NOT NULL,
+            hidden_at  TEXT NOT NULL,
+            PRIMARY KEY (user_id, message_id)
+        )
+    """)
+
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS typing_status (
             user_id    TEXT NOT NULL,
             trip_id    TEXT NOT NULL,

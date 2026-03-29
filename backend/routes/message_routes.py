@@ -31,10 +31,12 @@ def get_messages(trip_id):
                u.id AS user_id, u.name AS user_name, u.profile_picture
         FROM messages m
         JOIN users u ON m.user_id = u.id
+                LEFT JOIN message_hidden mh ON mh.message_id = m.id AND mh.user_id = ?
         WHERE m.trip_id = ?
+                    AND mh.message_id IS NULL
         ORDER BY m.sent_at ASC
         """,
-        (trip_id,),
+                (user_id, trip_id),
     ).fetchall()
 
     result = []
@@ -223,6 +225,9 @@ def delete_message(trip_id, message_id):
         conn.close()
         return jsonify({"error": "Not a member"}), 403
 
+    data = request.get_json(silent=True) or {}
+    mode = (data.get("mode") or "me").strip().lower()
+
     msg = conn.execute(
         "SELECT id, user_id FROM messages WHERE id = ? AND trip_id = ?",
         (message_id, trip_id),
@@ -232,10 +237,29 @@ def delete_message(trip_id, message_id):
         conn.close()
         return jsonify({"error": "Message not found"}), 404
 
+    if mode == "me":
+        conn.execute(
+            """
+            INSERT INTO message_hidden (user_id, message_id, hidden_at)
+            VALUES (?, ?, ?)
+            ON CONFLICT (user_id, message_id)
+            DO NOTHING
+            """,
+            (user_id, message_id, now()),
+        )
+        conn.commit()
+        conn.close()
+        return jsonify({"success": True, "message": "Message hidden for you"}), 200
+
+    if mode != "everyone":
+        conn.close()
+        return jsonify({"error": "Invalid delete mode"}), 400
+
     if msg["user_id"] != user_id:
         conn.close()
-        return jsonify({"error": "Only sender can delete this message"}), 403
+        return jsonify({"error": "Only sender can delete for everyone"}), 403
 
+    conn.execute("DELETE FROM message_hidden WHERE message_id = ?", (message_id,))
     conn.execute("DELETE FROM message_files WHERE message_id = ?", (message_id,))
     conn.execute("DELETE FROM message_reactions WHERE message_id = ?", (message_id,))
     conn.execute("DELETE FROM read_receipts WHERE message_id = ?", (message_id,))
@@ -244,7 +268,7 @@ def delete_message(trip_id, message_id):
     conn.commit()
     conn.close()
 
-    return jsonify({"success": True, "message": "Message deleted"}), 200
+    return jsonify({"success": True, "message": "Message deleted for everyone"}), 200
 
 
 @message_bp.route("/<trip_id>/messages/<message_id>/react", methods=["DELETE"])
