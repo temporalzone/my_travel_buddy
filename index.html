@@ -1164,7 +1164,7 @@ function CreatePage({user,onCreate,setPage}){
 /* ══════════════════════════════
    PROFILE PAGE
 ══════════════════════════════ */
-function ProfilePage({user,onUpdate,onLogout,showToast}){
+function ProfilePage({user,onUpdate,onLogout,onDeleteAccount,showToast}){
   const [editing,setEditing]=useState(false);
   const [f,setF]=useState({name:user.name,email:user.email,loc:user.location,bio:user.bio,interests:(user.interests||[]).join(', '),age:user.age||'',gender:user.gender||'Prefer not to say',photo:user.profile_picture||''});
   const [pw,setPw]=useState({old:'',n1:'',n2:''});
@@ -1208,6 +1208,17 @@ function ProfilePage({user,onUpdate,onLogout,showToast}){
   };
 
   const joined=new Date(user.joinedAt||Date.now()).toLocaleDateString('en-IN',{year:'numeric',month:'short',day:'numeric'});
+
+  const deleteAccount=async()=>{
+    const ok=window.confirm('Are you sure? This will mark your account as deleted and log you out.');
+    if(!ok)return;
+    const out=await onDeleteAccount();
+    if(out&&out.error){
+      showToast(`❌ ${out.error}`);
+      return;
+    }
+    showToast('Account marked as deleted. Logging out...');
+  };
 
   return(
     <div className="prof-wrap fade-up">
@@ -1266,8 +1277,11 @@ function ProfilePage({user,onUpdate,onLogout,showToast}){
 
       <div className="prof-sec">
         <h4>⚠️ Account</h4>
-        <p style={{fontSize:'.82rem',color:'var(--muted)',marginBottom:'.9rem'}}>Logging out will end your current session. Your data will be saved.</p>
-        <button className="btn btn-danger btn-sm" onClick={onLogout}>🚪 Logout</button>
+        <p style={{fontSize:'.82rem',color:'var(--muted)',marginBottom:'.9rem'}}>You can logout safely, or mark your account as deleted (ID/history retained).</p>
+        <div style={{display:'flex',gap:'.55rem',flexWrap:'wrap'}}>
+          <button className="btn btn-danger btn-sm" onClick={onLogout}>🚪 Logout</button>
+          <button className="btn btn-outline btn-sm" style={{borderColor:'var(--rose)',color:'var(--rose)'}} onClick={deleteAccount}>🗑️ Delete Account</button>
+        </div>
       </div>
     </div>
   );
@@ -1344,7 +1358,7 @@ function UserModal({uid_,users,onClose}){
 /* ══════════════════════════════
    APP SHELL
 ══════════════════════════════ */
-function AppShell({user,trips,users,onLogout,onUpdate,onJoin,onCreateTrip,onUpdateTrip,pendingRequests,onApproveRequest,onRejectRequest}){
+function AppShell({user,trips,users,onLogout,onUpdate,onDeleteAccount,onJoin,onCreateTrip,onUpdateTrip,pendingRequests,onApproveRequest,onRejectRequest}){
   const [page,setPage]=useState('dashboard');
   const [openTripId,setOpenTripId]=useState(null);
   const [viewUid,setViewUid]=useState(null);
@@ -1421,7 +1435,7 @@ function AppShell({user,trips,users,onLogout,onUpdate,onJoin,onCreateTrip,onUpda
           {page==='dashboard'&&<Dashboard user={user} trips={trips} users={users} onJoin={joinTrip} onOpen={openTrip} setPage={setPage} pendingRequests={pendingRequests} onApproveRequest={onApproveRequest} onRejectRequest={onRejectRequest}/>}
           {page==='explore'&&<ExplorePage trips={trips} user={user} users={users} onJoin={joinTrip} onOpen={openTrip}/>}
           {page==='create'&&<CreatePage user={user} onCreate={async t=>{const out=await onCreateTrip(t); if(out&&out.error){showToast(`❌ ${out.error}`);return;} showToast('🚀 Trip created! Others can now find and join it.');}} setPage={setPage}/>}
-          {page==='profile'&&<ProfilePage user={user} onUpdate={onUpdate} onLogout={onLogout} showToast={showToast}/>}
+          {page==='profile'&&<ProfilePage user={user} onUpdate={onUpdate} onLogout={onLogout} onDeleteAccount={onDeleteAccount} showToast={showToast}/>}
           {page==='chat'&&openTripObj&&(
             <ChatPage trip={openTripObj} user={user} users={users} allTrips={trips} onBack={()=>setPage('dashboard')} onViewUser={id=>setViewUid(id)} onUpdateTrip={onUpdateTrip}/>
           )}
@@ -1536,6 +1550,19 @@ function App(){
     setTrips(ts=>ts.map(x=>x.id===t.id?t:x));
   };
 
+  const deleteAccount=async()=>{
+    const res=await fetch(`${BASE}/users/me`,{
+      method:'DELETE',
+      headers:authHeaders()
+    });
+    const data=await res.json();
+    if(!res.ok||data.error){
+      return {error:data.error||'Could not delete account'};
+    }
+    logout();
+    return data;
+  };
+
   if(!me) return <AuthScreen onLogin={login} users={users} setUsers={setUsers}/>;
 
   const freshMe=users.find(u=>u.id===me.id)||me;
@@ -1547,6 +1574,7 @@ function App(){
       users={users}
       onLogout={logout}
       onUpdate={updateUser}
+      onDeleteAccount={deleteAccount}
       onJoin={joinTrip}
       onCreateTrip={createTrip}
       onUpdateTrip={updateTrip}
