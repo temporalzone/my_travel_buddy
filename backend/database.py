@@ -2,7 +2,6 @@ import os
 import sqlite3
 import importlib
 import socket
-from urllib.parse import urlparse, urlunparse, parse_qsl, urlencode
 
 
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -40,40 +39,52 @@ def _resolve_db_name():
 DB_NAME = _resolve_db_name()
 
 
-def _inject_hostaddr_ipv4(db_url):
-    """Return a DATABASE_URL with hostaddr=<ipv4> for libpq IPv4 fallback."""
-    parsed = urlparse(db_url)
-    host = parsed.hostname
-    port = parsed.port or 5432
-    if not host:
-        return None
+def _extract_host_port_from_db_url(db_url):
+    """Best-effort parser that survives special chars in username/password."""
+    try:
+        rhs = db_url.split("://", 1)[1]
+    except Exception:
+        return None, 5432
 
-    query_items = dict(parse_qsl(parsed.query, keep_blank_values=True))
-    if "hostaddr" in query_items:
-        return db_url
+    authority = rhs.rsplit("@", 1)[-1].split("/", 1)[0]
+    if not authority:
+        return None, 5432
 
+    # [ipv6]:5432
+    if authority.startswith("["):
+        end = authority.find("]")
+        if end == -1:
+            return None, 5432
+        host = authority[1:end]
+        port = 5432
+        rest = authority[end + 1 :]
+        if rest.startswith(":"):
+            try:
+                port = int(rest[1:])
+            except Exception:
+                port = 5432
+        return host, port
+
+    # hostname:5432 (or hostname)
+    if ":" in authority:
+        host, port_text = authority.split(":", 1)
+        try:
+            port = int(port_text)
+        except Exception:
+            port = 5432
+        return host, port
+
+    return authority, 5432
+
+
+def _resolve_ipv4(host, port):
     try:
         infos = socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM)
     except Exception:
         return None
-
     if not infos:
         return None
-
-    ipv4 = infos[0][4][0]
-    query_items["hostaddr"] = ipv4
-    query_items.setdefault("sslmode", "require")
-
-    return urlunparse(
-        (
-            parsed.scheme,
-            parsed.netloc,
-            parsed.path,
-            parsed.params,
-            urlencode(query_items),
-            parsed.fragment,
-        )
-    )
+    return infos[0][4][0]
 
 
 def _convert_sql(sql):
@@ -117,9 +128,15 @@ def get_db():
             # Supabase direct host can resolve to IPv6 first in some environments.
             # Retry once with hostaddr=<ipv4> so connection uses IPv4 transport.
             if "Network is unreachable" in err or "connection is bad" in err:
-                ipv4_url = _inject_hostaddr_ipv4(DATABASE_URL)
-                if ipv4_url and ipv4_url != DATABASE_URL:
-                    return PgCompatConn(driver_module.connect(ipv4_url), driver_kind, row_helper)
+                host, port = _extract_host_port_from_db_url(DATABASE_URL)
+                if host:
+                    ipv4 = _resolve_ipv4(host, port)
+                    if ipv4:
+                        return PgCompatConn(
+                            driver_module.connect(DATABASE_URL, hostaddr=ipv4),
+                            driver_kind,
+                            row_helper,
+                        )
             raise
 
     _ensure_db_dir(DB_NAME)
