@@ -795,13 +795,30 @@ function ChatPage({trip,user,users,allTrips,onBack,onViewUser,onUpdateTrip}){
   const [memberProfiles,setMemberProfiles]=useState([]);
   const btm=useRef(null);
   const fileInputRef=useRef(null);
+  const chatMsgsRef=useRef(null);
+  const shouldStickToBottom=useRef(true);
   const BASE='https://my-travel-buddy-kn22.onrender.com/api';
   const MSG_BASE=`${BASE}/messages`;
   const auth=()=>({'Authorization':`Bearer ${localStorage.getItem('tb_token')}`,'Content-Type':'application/json'});
 
   const emojis=['👍','❤️','😂','😮','😢','🔥','✨','👏'];
 
-  useEffect(()=>btm.current?.scrollIntoView({behavior:'smooth'}),[msgs,typingUsers]);
+  useEffect(()=>{
+    btm.current?.scrollIntoView({behavior:'auto'});
+  },[]);
+
+  useEffect(()=>{
+    if(shouldStickToBottom.current){
+      btm.current?.scrollIntoView({behavior:'smooth'});
+    }
+  },[msgs.length]);
+
+  const handleChatScroll=()=>{
+    const el=chatMsgsRef.current;
+    if(!el)return;
+    const distanceFromBottom=el.scrollHeight-el.scrollTop-el.clientHeight;
+    shouldStickToBottom.current=distanceFromBottom<80;
+  };
 
   const loadMessages=async()=>{
     try{
@@ -911,6 +928,7 @@ function ChatPage({trip,user,users,allTrips,onBack,onViewUser,onUpdateTrip}){
       });
 
       if(res.ok){
+        shouldStickToBottom.current=true;
         setInp('');
         setUploadedImage(null);
         await loadMessages();
@@ -983,7 +1001,7 @@ function ChatPage({trip,user,users,allTrips,onBack,onViewUser,onUpdateTrip}){
             <h4>💬 Group Chat</h4>
             <span style={{fontSize:'.72rem',color:'var(--muted)'}}>{members.length} member{members.length!==1?'s':''}</span>
           </div>
-          <div className="chat-msgs">
+          <div className="chat-msgs" ref={chatMsgsRef} onScroll={handleChatScroll}>
             <div style={{textAlign:'center',fontSize:'.72rem',color:'var(--muted)',padding:'.65rem',background:'var(--surface)',borderRadius:8}}>
               {trip.emoji} {trip.title} group chat — say hello!
             </div>
