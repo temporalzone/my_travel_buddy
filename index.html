@@ -1277,13 +1277,53 @@ function ProfilePage({user,onUpdate,onLogout,showToast}){
    USER PROFILE MODAL
 ══════════════════════════════ */
 function UserModal({uid_,users,onClose}){
-  const u=users.find(x=>x.id===uid_);
-  if(!u)return null;
+  const [u,setU]=useState(users.find(x=>x.id===uid_)||null);
+  const [loading,setLoading]=useState(!users.find(x=>x.id===uid_));
+  const [err,setErr]=useState('');
+
+  useEffect(()=>{
+    const localUser=users.find(x=>x.id===uid_);
+    if(localUser){
+      setU(localUser);
+      setLoading(false);
+      setErr('');
+      return;
+    }
+
+    let alive=true;
+    const load=async()=>{
+      setLoading(true);
+      setErr('');
+      try{
+        const res=await fetch(`https://my-travel-buddy-kn22.onrender.com/api/users/${uid_}`);
+        const data=await res.json();
+        if(!alive)return;
+        if(!res.ok||data.error){
+          setErr(data.error||'Could not load profile.');
+          setU(null);
+        }else{
+          setU(data);
+        }
+      }catch(_){
+        if(!alive)return;
+        setErr('Could not load profile. Please try again.');
+        setU(null);
+      }finally{
+        if(alive)setLoading(false);
+      }
+    };
+    load();
+    return ()=>{alive=false;};
+  },[uid_,users]);
+
   return(
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={e=>e.stopPropagation()}>
+        {loading&&<div style={{fontSize:'.85rem',color:'var(--muted)',textAlign:'center',padding:'1.2rem 0'}}>Loading profile...</div>}
+        {!loading&&err&&<div className="alert-err">{err}</div>}
+        {!loading&&u&&<>
         <div style={{display:'flex',flexDirection:'column',alignItems:'center',marginBottom:'1.25rem'}}>
-          <Av name={u.name} size="lg"/>
+          <Av name={u.name} imageUrl={u.profile_picture||u.profilePicture} size="lg"/>
           <h3 style={{marginTop:'.85rem',marginBottom:'.22rem',fontFamily:'Syne,sans-serif',fontWeight:800,fontSize:'1.1rem',textAlign:'center'}}>{u.name}</h3>
           <p style={{color:'var(--muted)',fontSize:'.8rem'}}>📍 {u.location}</p>
         </div>
@@ -1293,6 +1333,7 @@ function UserModal({uid_,users,onClose}){
           <div style={{display:'flex',gap:'.3rem',flexWrap:'wrap',marginBottom:'1rem'}}>
             {u.interests.map(i=><span key={i} className="tag tag-blue">{i}</span>)}
           </div>
+        </>}
         </>}
         <button className="btn btn-outline" style={{width:'100%'}} onClick={onClose}>Close</button>
       </div>
