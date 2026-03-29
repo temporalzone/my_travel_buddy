@@ -49,6 +49,8 @@ def init_db():
     ensure_column("users", "age", "INTEGER")
     ensure_column("users", "gender", "TEXT")
     ensure_column("users", "profile_picture", "TEXT")
+    ensure_column("users", "is_deleted", "INTEGER DEFAULT 0")
+    ensure_column("users", "deleted_at", "TEXT")
 
     cur.execute("""
         CREATE TABLE IF NOT EXISTS trips (

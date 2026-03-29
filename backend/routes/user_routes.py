@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 import bcrypt
 from database import get_db
-from helpers import get_current_user
+from helpers import get_current_user, now
 
 user_bp = Blueprint("users", __name__)
 
@@ -20,6 +20,9 @@ def get_me():
     if not user:
         return jsonify({"error": "User not found"}), 404
 
+    if ("is_deleted" in user.keys()) and user["is_deleted"]:
+        return jsonify({"error": "Account is deleted"}), 403
+
     return jsonify({
         "id":        user["id"],
         "name":      user["name"],
@@ -30,7 +33,8 @@ def get_me():
         "joined_at": user["joined_at"],
         "age":       user["age"],
         "gender":    user["gender"],
-        "profile_picture": user["profile_picture"]
+        "profile_picture": user["profile_picture"],
+        "is_deleted": bool(user["is_deleted"]) if "is_deleted" in user.keys() else False
     }), 200
 
 
@@ -58,6 +62,14 @@ def update_profile():
         return jsonify({"error": "Profile picture must be uploaded image data"}), 400
 
     conn = get_db()
+    state = conn.execute("SELECT is_deleted FROM users WHERE id = ?", (user_id,)).fetchone()
+    if not state:
+        conn.close()
+        return jsonify({"error": "User not found"}), 404
+    if state["is_deleted"]:
+        conn.close()
+        return jsonify({"error": "Account is deleted"}), 403
+
     conn.execute("""
         UPDATE users
         SET name = ?, email = ?, location = ?, bio = ?, interests = ?, age = ?, gender = ?, profile_picture = ?
@@ -98,6 +110,14 @@ def change_password():
         "SELECT * FROM users WHERE id = ?", (user_id,)
     ).fetchone()
 
+    if not user:
+        conn.close()
+        return jsonify({"error": "User not found"}), 404
+
+    if ("is_deleted" in user.keys()) and user["is_deleted"]:
+        conn.close()
+        return jsonify({"error": "Account is deleted"}), 403
+
     if not bcrypt.checkpw(
         data["old_password"].encode("utf-8"),
         user["password"].encode("utf-8")
@@ -130,6 +150,19 @@ def get_user_profile(user_id):
     if not user:
         return jsonify({"error": "User not found"}), 404
 
+    if ("is_deleted" in user.keys()) and user["is_deleted"]:
+        return jsonify({
+            "id": user["id"],
+            "name": "Deleted User",
+            "location": "Unavailable",
+            "bio": "This account has been deleted.",
+            "interests": [],
+            "age": None,
+            "gender": None,
+            "profile_picture": None,
+            "is_deleted": True
+        }), 200
+
     return jsonify({
         "id":        user["id"],
         "name":      user["name"],
@@ -138,5 +171,32 @@ def get_user_profile(user_id):
         "interests": user["interests"].split(",") if user["interests"] else [],
         "age":       user["age"],
         "gender":    user["gender"],
-        "profile_picture": user["profile_picture"]
+        "profile_picture": user["profile_picture"],
+        "is_deleted": bool(user["is_deleted"]) if "is_deleted" in user.keys() else False
     }), 200
+
+
+@user_bp.route("/me", methods=["DELETE"])
+def soft_delete_me():
+    user_id = get_current_user()
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    conn = get_db()
+    user = conn.execute("SELECT id, is_deleted FROM users WHERE id = ?", (user_id,)).fetchone()
+    if not user:
+        conn.close()
+        return jsonify({"error": "User not found"}), 404
+
+    if user["is_deleted"]:
+        conn.close()
+        return jsonify({"message": "Account already deleted"}), 200
+
+    conn.execute(
+        "UPDATE users SET is_deleted = 1, deleted_at = ? WHERE id = ?",
+        (now(), user_id)
+    )
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "Account marked as deleted"}), 200

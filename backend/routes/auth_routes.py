@@ -23,7 +23,8 @@ def _build_user_response(user):
         "joined_at": user["joined_at"],
         "age": user["age"],
         "gender": user["gender"],
-        "profile_picture": user["profile_picture"]
+        "profile_picture": user["profile_picture"],
+        "is_deleted": bool(user["is_deleted"]) if "is_deleted" in user.keys() else False
     }
 
 @auth_bp.route("/register", methods=["POST"])
@@ -134,9 +135,11 @@ def request_register_otp():
         return jsonify({"error": "Profile picture must be uploaded image data"}), 400
 
     conn = get_db()
-    existing = conn.execute("SELECT id FROM users WHERE email = ?", (email,)).fetchone()
+    existing = conn.execute("SELECT id, is_deleted FROM users WHERE email = ?", (email,)).fetchone()
     if existing:
         conn.close()
+        if ("is_deleted" in existing.keys()) and existing["is_deleted"]:
+            return jsonify({"error": "This email belongs to a deleted account and cannot be reused."}), 409
         return jsonify({"error": "Email already registered"}), 409
 
     otp_code = str(random.randint(100000, 999999))
@@ -253,6 +256,9 @@ def login():
 
     if not user:
         return jsonify({"error": "Incorrect email or password"}), 401
+
+    if ("is_deleted" in user.keys()) and user["is_deleted"]:
+        return jsonify({"error": "This account has been deleted."}), 403
 
     pw_ok = bcrypt.checkpw(
         data["password"].encode("utf-8"),
