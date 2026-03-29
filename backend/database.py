@@ -5,6 +5,7 @@ import socket
 
 
 DATABASE_URL = os.getenv("DATABASE_URL")
+DATABASE_URL_POOLER = os.getenv("DATABASE_URL_POOLER") or os.getenv("DATABASE_URL_FALLBACK")
 USE_POSTGRES = bool(DATABASE_URL)
 
 
@@ -121,23 +122,42 @@ def _ensure_db_dir(path):
 def get_db():
     if USE_POSTGRES:
         driver_kind, driver_module, row_helper = _load_postgres_driver()
+        errors = []
+
+        # 1) Prefer explicit pooler/fallback URL when provided.
+        if DATABASE_URL_POOLER:
+            try:
+                return PgCompatConn(driver_module.connect(DATABASE_URL_POOLER), driver_kind, row_helper)
+            except Exception as e:
+                errors.append(f"pooler url failed: {e}")
+
+        # 2) Try primary DATABASE_URL.
         try:
             return PgCompatConn(driver_module.connect(DATABASE_URL), driver_kind, row_helper)
         except Exception as e:
+            errors.append(f"primary url failed: {e}")
+
+            # 3) If network path fails, retry with explicit IPv4 hostaddr.
             err = str(e)
-            # Supabase direct host can resolve to IPv6 first in some environments.
-            # Retry once with hostaddr=<ipv4> so connection uses IPv4 transport.
             if "Network is unreachable" in err or "connection is bad" in err:
                 host, port = _extract_host_port_from_db_url(DATABASE_URL)
                 if host:
                     ipv4 = _resolve_ipv4(host, port)
                     if ipv4:
-                        return PgCompatConn(
-                            driver_module.connect(DATABASE_URL, hostaddr=ipv4),
-                            driver_kind,
-                            row_helper,
-                        )
-            raise
+                        try:
+                            return PgCompatConn(
+                                driver_module.connect(DATABASE_URL, hostaddr=ipv4),
+                                driver_kind,
+                                row_helper,
+                            )
+                        except Exception as e2:
+                            errors.append(f"ipv4 hostaddr retry failed: {e2}")
+
+        raise RuntimeError(
+            "PostgreSQL connection failed. "
+            + " | ".join(errors)
+            + ". If using Supabase, set DATABASE_URL_POOLER to the Session/Transaction pooler URL."
+        )
 
     _ensure_db_dir(DB_NAME)
     conn = sqlite3.connect(DB_NAME)
