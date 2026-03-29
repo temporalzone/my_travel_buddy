@@ -934,6 +934,25 @@ function ChatPage({trip,user,users,allTrips,onBack,onViewUser,onUpdateTrip}){
     }
   };
 
+  const deleteMessage=async(messageId)=>{
+    const ok=window.confirm('Delete this message? This cannot be undone.');
+    if(!ok)return;
+    try{
+      const res=await fetch(`${MSG_BASE}/${trip.id}/messages/${messageId}`,{
+        method:'DELETE',
+        headers:auth()
+      });
+      const data=await res.json();
+      if(!res.ok||data.error){
+        alert(data.error||'Could not delete message');
+        return;
+      }
+      await loadMessages();
+    }catch(_){
+      alert('Could not delete message right now.');
+    }
+  };
+
   return(
     <div style={{height:'calc(100vh - 5rem)'}}>
       <div style={{display:'flex',alignItems:'center',gap:'.9rem',marginBottom:'.9rem'}}>
@@ -990,6 +1009,11 @@ function ChatPage({trip,user,users,allTrips,onBack,onViewUser,onUpdateTrip}){
                           <span style={{marginLeft:'.4rem',fontSize:'.8em'}}>
                             {m.readCount&&m.readCount>1?'✓✓':'✓'}
                           </span>
+                        )}
+                        {mine&&(
+                          <button className="btn btn-xs btn-outline" style={{marginLeft:'.45rem',padding:'.12rem .45rem'}} onClick={()=>deleteMessage(m.id)}>
+                            Delete
+                          </button>
                         )}
                       </div>
                       
@@ -1303,21 +1327,24 @@ function UserModal({uid_,users,onClose}){
     const load=async()=>{
       setLoading(true);
       setErr('');
+      const controller=new AbortController();
+      const timeoutId=setTimeout(()=>controller.abort(),7000);
       try{
-        const res=await fetch(`https://my-travel-buddy-kn22.onrender.com/api/users/${uid_}`);
+        const res=await fetch(`https://my-travel-buddy-kn22.onrender.com/api/users/${uid_}`,{signal:controller.signal});
         const data=await res.json();
         if(!alive)return;
         if(!res.ok||data.error){
           setErr(data.error||'Could not load profile.');
-          setU(null);
+          if(!localUser) setU(null);
         }else{
           setU(data);
         }
       }catch(_){
         if(!alive)return;
-        setErr('Could not load profile. Please try again.');
-        setU(null);
+        setErr('Taking too long to load full profile. Showing available info.');
+        if(!localUser) setU(null);
       }finally{
+        clearTimeout(timeoutId);
         if(alive)setLoading(false);
       }
     };

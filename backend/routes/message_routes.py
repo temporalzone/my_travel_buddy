@@ -212,6 +212,41 @@ def react_to_message(trip_id, message_id):
     return jsonify({"emoji": emoji, "success": True}), 200
 
 
+@message_bp.route("/<trip_id>/messages/<message_id>", methods=["DELETE"])
+def delete_message(trip_id, message_id):
+    user_id = get_current_user()
+    if not user_id:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    conn = get_db()
+    if not _require_trip_member(conn, trip_id, user_id):
+        conn.close()
+        return jsonify({"error": "Not a member"}), 403
+
+    msg = conn.execute(
+        "SELECT id, user_id FROM messages WHERE id = ? AND trip_id = ?",
+        (message_id, trip_id),
+    ).fetchone()
+
+    if not msg:
+        conn.close()
+        return jsonify({"error": "Message not found"}), 404
+
+    if msg["user_id"] != user_id:
+        conn.close()
+        return jsonify({"error": "Only sender can delete this message"}), 403
+
+    conn.execute("DELETE FROM message_files WHERE message_id = ?", (message_id,))
+    conn.execute("DELETE FROM message_reactions WHERE message_id = ?", (message_id,))
+    conn.execute("DELETE FROM read_receipts WHERE message_id = ?", (message_id,))
+    conn.execute("DELETE FROM messages WHERE id = ?", (message_id,))
+
+    conn.commit()
+    conn.close()
+
+    return jsonify({"success": True, "message": "Message deleted"}), 200
+
+
 @message_bp.route("/<trip_id>/messages/<message_id>/react", methods=["DELETE"])
 def remove_reaction(trip_id, message_id):
     user_id = get_current_user()
