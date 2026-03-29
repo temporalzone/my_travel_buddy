@@ -1,9 +1,16 @@
 from flask import Blueprint, request, jsonify
 import bcrypt
+import os
 from database import get_db
 from helpers import get_current_user, now
 
 user_bp = Blueprint("users", __name__)
+
+
+def _is_admin_request():
+    admin_key = os.getenv("ADMIN_KEY", "")
+    req_key = request.headers.get("X-Admin-Key", "")
+    return bool(admin_key) and req_key == admin_key
 
 @user_bp.route("/me", methods=["GET"])
 def get_me():
@@ -200,3 +207,59 @@ def soft_delete_me():
     conn.close()
 
     return jsonify({"message": "Account marked as deleted"}), 200
+
+
+@user_bp.route("/admin/deleted-users", methods=["GET"])
+def list_deleted_users():
+    if not _is_admin_request():
+        return jsonify({"error": "Forbidden"}), 403
+
+    conn = get_db()
+    rows = conn.execute(
+        """
+        SELECT id, name, email, deleted_at
+        FROM users
+        WHERE is_deleted = 1
+        ORDER BY deleted_at DESC
+        """
+    ).fetchall()
+    conn.close()
+
+    return jsonify([
+        {
+            "id": r["id"],
+            "name": r["name"],
+            "email": r["email"],
+            "deleted_at": r["deleted_at"],
+        }
+        for r in rows
+    ]), 200
+
+
+@user_bp.route("/admin/users/<user_id>/restore", methods=["POST"])
+def restore_deleted_user(user_id):
+    if not _is_admin_request():
+        return jsonify({"error": "Forbidden"}), 403
+
+    conn = get_db()
+    row = conn.execute(
+        "SELECT id, is_deleted FROM users WHERE id = ?",
+        (user_id,)
+    ).fetchone()
+
+    if not row:
+        conn.close()
+        return jsonify({"error": "User not found"}), 404
+
+    if not row["is_deleted"]:
+        conn.close()
+        return jsonify({"message": "User is already active"}), 200
+
+    conn.execute(
+        "UPDATE users SET is_deleted = 0, deleted_at = NULL WHERE id = ?",
+        (user_id,)
+    )
+    conn.commit()
+    conn.close()
+
+    return jsonify({"message": "User restored successfully"}), 200
