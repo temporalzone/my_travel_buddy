@@ -1292,17 +1292,12 @@ function ProfilePage({user,onUpdate,onLogout,onDeleteAccount,showToast}){
 ══════════════════════════════ */
 function UserModal({uid_,users,onClose}){
   const [u,setU]=useState(users.find(x=>x.id===uid_)||null);
-  const [loading,setLoading]=useState(!users.find(x=>x.id===uid_));
+  const [loading,setLoading]=useState(true);
   const [err,setErr]=useState('');
 
   useEffect(()=>{
     const localUser=users.find(x=>x.id===uid_);
-    if(localUser){
-      setU(localUser);
-      setLoading(false);
-      setErr('');
-      return;
-    }
+    if(localUser) setU(localUser);
 
     let alive=true;
     const load=async()=>{
@@ -1339,10 +1334,25 @@ function UserModal({uid_,users,onClose}){
         <div style={{display:'flex',flexDirection:'column',alignItems:'center',marginBottom:'1.25rem'}}>
           <Av name={u.name} imageUrl={u.profile_picture||u.profilePicture} size="lg"/>
           <h3 style={{marginTop:'.85rem',marginBottom:'.22rem',fontFamily:'Syne,sans-serif',fontWeight:800,fontSize:'1.1rem',textAlign:'center'}}>{u.name}</h3>
-          <p style={{color:'var(--muted)',fontSize:'.8rem'}}>📍 {u.location}</p>
+          <p style={{color:'var(--muted)',fontSize:'.8rem'}}>📍 {u.location||'Location not set'}</p>
         </div>
-        <div style={{background:'var(--surface)',borderRadius:10,padding:'.85rem',marginBottom:'.85rem',fontSize:'.84rem',lineHeight:1.6,color:'var(--text)'}}>{u.bio||'No bio yet.'}</div>
-        {(u.interests||[]).length>0&&<>
+
+        <div style={{background:'var(--surface)',borderRadius:10,padding:'.85rem',marginBottom:'.75rem',fontSize:'.84rem',lineHeight:1.6,color:'var(--text)'}}>
+          {u.bio&&u.bio.trim()!=='.'?u.bio:'No bio yet.'}
+        </div>
+
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:'.55rem',marginBottom:'.8rem'}}>
+          <div style={{background:'var(--surface)',borderRadius:9,padding:'.55rem .65rem'}}>
+            <div style={{fontSize:'.66rem',color:'var(--muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.04em'}}>Age</div>
+            <div style={{fontSize:'.84rem',fontWeight:700,color:'var(--ink)'}}>{u.age||'Not set'}</div>
+          </div>
+          <div style={{background:'var(--surface)',borderRadius:9,padding:'.55rem .65rem'}}>
+            <div style={{fontSize:'.66rem',color:'var(--muted)',fontWeight:700,textTransform:'uppercase',letterSpacing:'.04em'}}>Gender</div>
+            <div style={{fontSize:'.84rem',fontWeight:700,color:'var(--ink)'}}>{u.gender||'Not set'}</div>
+          </div>
+        </div>
+
+        {Array.isArray(u.interests) && u.interests.length>0&&<>
           <div style={{fontSize:'.7rem',fontWeight:700,textTransform:'uppercase',letterSpacing:'.05em',color:'var(--muted)',marginBottom:'.4rem'}}>Interests</div>
           <div style={{display:'flex',gap:'.3rem',flexWrap:'wrap',marginBottom:'1rem'}}>
             {u.interests.map(i=><span key={i} className="tag tag-blue">{i}</span>)}
