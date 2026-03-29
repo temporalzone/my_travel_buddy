@@ -1,8 +1,25 @@
+import os
 import sqlite3
 
-DB_NAME = "travelbuddy.db"
+
+def _resolve_db_name():
+    # Use env var for production persistent disks (e.g. /var/data/travelbuddy.db on Render).
+    env_path = os.getenv("DB_NAME") or os.getenv("DATABASE_PATH")
+    if env_path:
+        return env_path
+    return os.path.join(os.path.dirname(__file__), "travelbuddy.db")
+
+
+DB_NAME = _resolve_db_name()
+
+
+def _ensure_db_dir(path):
+    folder = os.path.dirname(path)
+    if folder:
+        os.makedirs(folder, exist_ok=True)
 
 def get_db():
+    _ensure_db_dir(DB_NAME)
     conn = sqlite3.connect(DB_NAME)
     conn.row_factory = sqlite3.Row
     return conn
