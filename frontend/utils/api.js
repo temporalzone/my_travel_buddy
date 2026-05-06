@@ -13,6 +13,16 @@ const headers = () => ({
   "Authorization": `Bearer ${getToken()}`
 });
 
+// Safe JSON parsing (so fetch errors don’t fail silently)
+const safeJson = async (res) => {
+  const text = await res.text();
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    return { error: text || "Unexpected server response" };
+  }
+};
+
 // ── AUTH ───────────────────────────────────────────────────
 const API = {
 
@@ -22,7 +32,7 @@ const API = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data)
     });
-    return res.json();
+    return safeJson(res);
   },
 
   login: async (data) => {
@@ -31,7 +41,7 @@ const API = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data)
     });
-    return res.json();
+    return safeJson(res);
   },
 
   forgotPassword: async (email) => {
@@ -40,7 +50,7 @@ const API = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email })
     });
-    return res.json();
+    return safeJson(res);
   },
 
   resetPassword: async (data) => {
@@ -49,13 +59,13 @@ const API = {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data)
     });
-    return res.json();
+    return safeJson(res);
   },
 
   // ── USERS ────────────────────────────────────────────────
   getMe: async () => {
     const res = await fetch(`${BASE_URL}/users/me`, { headers: headers() });
-    return res.json();
+    return safeJson(res);
   },
 
   updateProfile: async (data) => {
@@ -64,7 +74,7 @@ const API = {
       headers: headers(),
       body: JSON.stringify(data)
     });
-    return res.json();
+    return safeJson(res);
   },
 
   changePassword: async (old_password, new_password) => {
@@ -73,18 +83,18 @@ const API = {
       headers: headers(),
       body: JSON.stringify({ old_password, new_password })
     });
-    return res.json();
+    return safeJson(res);
   },
 
   getUser: async (userId) => {
     const res = await fetch(`${BASE_URL}/users/${userId}`, { headers: headers() });
-    return res.json();
+    return safeJson(res);
   },
 
   // ── TRIPS ────────────────────────────────────────────────
   getTrips: async () => {
     const res = await fetch(`${BASE_URL}/trips/`, { headers: headers() });
-    return res.json();
+    return safeJson(res);
   },
 
   createTrip: async (data) => {
@@ -93,7 +103,7 @@ const API = {
       headers: headers(),
       body: JSON.stringify(data)
     });
-    return res.json();
+    return safeJson(res);
   },
 
   joinTrip: async (tripId) => {
@@ -101,13 +111,13 @@ const API = {
       method: "POST",
       headers: headers()
     });
-    return res.json();
+    return safeJson(res);
   },
 
   // ── MESSAGES ─────────────────────────────────────────────
   getMessages: async (tripId) => {
     const res = await fetch(`${BASE_URL}/messages/${tripId}`, { headers: headers() });
-    return res.json();
+    return safeJson(res);
   },
 
   sendMessage: async (tripId, text) => {
@@ -116,6 +126,6 @@ const API = {
       headers: headers(),
       body: JSON.stringify({ text })
     });
-    return res.json();
+    return safeJson(res);
   }
 };
