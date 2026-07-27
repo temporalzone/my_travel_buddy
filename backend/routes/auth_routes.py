@@ -166,6 +166,12 @@ def request_register_otp():
 
     sent, msg = send_registration_otp_email(email, otp_code)
     if not sent:
+        print(f"[DEBUG] Registration OTP for {email} is {otp_code}")
+        if ALLOW_RESET_LINK_FALLBACK:
+            return jsonify({
+                "message": "Email delivery failed, but you can still register using this OTP (local fallback).",
+                "otp": otp_code
+            }), 200
         return jsonify({"error": "Could not send OTP email. Try again later."}), 500
 
     return jsonify({"message": "OTP sent to your email."}), 200

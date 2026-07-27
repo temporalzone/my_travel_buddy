@@ -8,10 +8,10 @@ from dotenv import load_dotenv
 
 load_dotenv()  # .env file se values load karo
 
-SECRET_KEY = os.getenv("SECRET_KEY", "travelbuddy_secret_2025")
-SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
-FROM_EMAIL = os.getenv("SENDGRID_FROM_EMAIL")
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5500")
+SECRET_KEY = os.getenv("SECRET_KEY", "travelbuddy_secret_2025").strip()
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY", "").strip() or None
+FROM_EMAIL = os.getenv("SENDGRID_FROM_EMAIL", "").strip() or None
+FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5500").strip()
 
 def create_token(user_id):
     payload = {
@@ -103,27 +103,27 @@ def send_reset_email(to_email, reset_token):
             response = sg.send(email)
             status = getattr(response, "status_code", None)
             if status in (200, 202):
-                print(f"Email sent via SendGrid to {to_email} (status={status})")
+                print(f"Email sent via SendGrid to {to_email} (status={status})", flush=True)
                 return True, "Email sent via SendGrid"
 
             body = getattr(response, "body", b"")
             if isinstance(body, bytes):
                 body = body.decode("utf-8", errors="ignore")
-            print(f"SendGrid failed with status={status}, body={body}")
+            print(f"SendGrid failed with status={status}, body={body}", flush=True)
             sendgrid_error = f"SendGrid status={status} body={body}"
         else:
-            print("SendGrid skipped: SENDGRID_API_KEY or SENDGRID_FROM_EMAIL missing")
+            print("SendGrid skipped: SENDGRID_API_KEY or SENDGRID_FROM_EMAIL missing", flush=True)
             sendgrid_error = "SendGrid skipped: missing SENDGRID_API_KEY or SENDGRID_FROM_EMAIL"
     except Exception as e:
-        print(f"SendGrid exception: {str(e)}")
+        print(f"SendGrid exception: {str(e)}", flush=True)
         sendgrid_error = f"SendGrid exception: {str(e)}"
 
     # Fallback to Gmail SMTP
-    GMAIL = os.getenv("GMAIL_USER")
-    GMAIL_PASS = os.getenv("GMAIL_APP_PASSWORD")
+    GMAIL = os.getenv("GMAIL_USER", "").strip() or None
+    GMAIL_PASS = os.getenv("GMAIL_APP_PASSWORD", "").strip() or None
 
     if not GMAIL or not GMAIL_PASS:
-        print("No fallback email credentials (GMAIL_USER/GMAIL_APP_PASSWORD missing)")
+        print("No fallback email credentials (GMAIL_USER/GMAIL_APP_PASSWORD missing)", flush=True)
         return False, f"{sendgrid_error}; Gmail fallback missing credentials"
 
     msg = MIMEMultipart('alternative')

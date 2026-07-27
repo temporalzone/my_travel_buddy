@@ -256,6 +256,10 @@ html,body{height:100%;font-family:'Nunito',sans-serif;background:var(--surface);
 <script type="text/babel">
 const {useState,useEffect,useRef} = React;
 
+const BASE = (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')
+  ? 'http://localhost:5000/api'
+  : 'https://my-travel-buddy-kn22.onrender.com/api';
+
 /* ── CONSTANTS ── */
 const COLORS=['#0EA5E9','#10B981','#F59E0B','#8B5CF6','#F43F5E','#06B6D4','#84CC16','#EC4899'];
 const GRADS=[
@@ -380,15 +384,26 @@ function AuthScreen({onLogin,users,setUsers}){
   const login=async()=>{
     setErr('');
     if(!f.email||!f.pw){setErr('Please fill all fields.');return;}
-    const res=await fetch('https://my-travel-buddy-kn22.onrender.com/api/auth/login',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({email:f.email,password:f.pw})
-    });
-    const data=await res.json();
-    if(data.error){setErr(data.error);return;}
-    localStorage.setItem('tb_token',data.token);
-    onLogin(data.user);
+    try {
+      const res=await fetch(`${BASE}/auth/login`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email:f.email,password:f.pw})
+      });
+      let data;
+      try {
+        data=await res.json();
+      } catch(_) {
+        setErr('Server returned an invalid response. The server might be booting up.');
+        return;
+      }
+      if(!res.ok || data.error){setErr(data.error||'Login failed.');return;}
+      localStorage.setItem('tb_token',data.token);
+      onLogin(data.user);
+    } catch(e) {
+      console.error(e);
+      setErr('Connection failed. The server might be waking up or unreachable. Please try again.');
+    }
   };
   const register=async()=>{
     setErr('');
@@ -399,47 +414,73 @@ function AuthScreen({onLogin,users,setUsers}){
     const ageNum=f.age?parseInt(f.age,10):null;
     if(isNaN(ageNum) || ageNum<13 || ageNum>100){setErr('Age should be between 13 and 100.');return;}
     if(!String(f.photo).startsWith('data:image/')){setErr('Please upload a valid profile image from your device.');return;}
-    const res=await fetch('https://my-travel-buddy-kn22.onrender.com/api/auth/request-register-otp',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({
-        name:f.name.trim(),
-        email:f.email.trim(),
-        password:f.pw,
-        location:f.loc.trim(),
-        bio:f.bio.trim(),
-        age:ageNum,
-        gender:f.gender,
-        profile_picture:f.photo
-      })
-    });
-    const data=await res.json();
-    if(data.error){setErr(data.error);return;}
-    setOtpEmail(f.email.trim().toLowerCase());
-    setView('verifyOtp');
-    setOk('OTP sent to your email. Enter it below to verify your account.');
+    try {
+      const res=await fetch(`${BASE}/auth/request-register-otp`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({
+          name:f.name.trim(),
+          email:f.email.trim(),
+          password:f.pw,
+          location:f.loc.trim(),
+          bio:f.bio.trim(),
+          age:ageNum,
+          gender:f.gender,
+          profile_picture:f.photo
+        })
+      });
+      let data;
+      try {
+        data=await res.json();
+      } catch(_) {
+        setErr('Server returned an invalid response. The server might be booting up.');
+        return;
+      }
+      if(!res.ok || data.error){setErr(data.error||'Failed to request verification code.');return;}
+      setOtpEmail(f.email.trim().toLowerCase());
+      setView('verifyOtp');
+      if(data.otp){
+        setOk(`[DEV MODE] OTP: ${data.otp}`);
+      } else {
+        setOk('OTP sent to your email. Enter it below to verify your account.');
+      }
+    } catch(e) {
+      console.error(e);
+      setErr('Connection failed. The server might be waking up or unreachable. Please try again.');
+    }
   };
 
   const verifyRegisterOtp=async()=>{
     setErr('');
     if(!otp||otp.length!==6){setErr('Enter 6-digit OTP.');return;}
-    const res=await fetch('https://my-travel-buddy-kn22.onrender.com/api/auth/verify-register-otp',{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({email:otpEmail,otp})
-    });
-    const data=await res.json();
-    if(data.error){setErr(data.error);return;}
-    localStorage.setItem('tb_token',data.token);
-    onLogin(data.user);
+    try {
+      const res=await fetch(`${BASE}/auth/verify-register-otp`,{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({email:otpEmail,otp})
+      });
+      let data;
+      try {
+        data=await res.json();
+      } catch(_) {
+        setErr('Server returned an invalid response.');
+        return;
+      }
+      if(!res.ok || data.error){setErr(data.error||'OTP verification failed.');return;}
+      localStorage.setItem('tb_token',data.token);
+      onLogin(data.user);
+    } catch(e) {
+      console.error(e);
+      setErr('Connection failed. Please try again.');
+    }
   };
   const forgot=async()=>{
     setErr('');setOk('');
     if(!f.email){setErr('Enter your email address.');return;}
     const payload={email:f.email.trim()};
     const urls=[
-      'https://my-travel-buddy-kn22.onrender.com/api/auth/forgot-password',
-      'https://my-travel-buddy-kn22.onrender.com/api/auth/forgot_password'
+      `${BASE}/auth/forgot-password`,
+      `${BASE}/auth/forgot_password`
     ];
 
     let lastError='Could not send email. Try again later.';
@@ -497,7 +538,7 @@ function AuthScreen({onLogin,users,setUsers}){
     }
 
     try{
-      const res=await fetch('https://my-travel-buddy-kn22.onrender.com/api/auth/reset-password',{
+      const res=await fetch(`${BASE}/auth/reset-password`,{
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify({token:resetToken,new_password:resetPw})
@@ -797,7 +838,6 @@ function ChatPage({trip,user,users,allTrips,onBack,onViewUser,onUpdateTrip}){
   const fileInputRef=useRef(null);
   const chatMsgsRef=useRef(null);
   const shouldStickToBottom=useRef(true);
-  const BASE='https://my-travel-buddy-kn22.onrender.com/api';
   const MSG_BASE=`${BASE}/messages`;
   const auth=()=>({'Authorization':`Bearer ${localStorage.getItem('tb_token')}`,'Content-Type':'application/json'});
 
@@ -1361,7 +1401,7 @@ function UserModal({uid_,users,onClose}){
       const controller=new AbortController();
       const timeoutId=setTimeout(()=>controller.abort(),7000);
       try{
-        const res=await fetch(`https://my-travel-buddy-kn22.onrender.com/api/users/${uid_}`,{signal:controller.signal});
+        const res=await fetch(`${BASE}/users/${uid_}`,{signal:controller.signal});
         const data=await res.json();
         if(!alive)return;
         if(!res.ok||data.error){
@@ -1525,7 +1565,6 @@ function App(){
   const [pendingRequests,setPendingRequests]=useState([]);
   const [me,setMe]=useState(null);
   const [loading,setLoading]=useState(true);
-  const BASE='https://my-travel-buddy-kn22.onrender.com/api';
   const getToken=()=>localStorage.getItem('tb_token');
   const authHeaders=()=>({'Content-Type':'application/json','Authorization':'Bearer '+getToken()});
 
@@ -1560,7 +1599,7 @@ function App(){
   const logout=()=>{setMe(null);localStorage.removeItem('tb_token');setTrips([]);setPendingRequests([]);};
 
   const updateUser=async(u)=>{
-    const res=await fetch('https://my-travel-buddy-kn22.onrender.com/api/users/me',{
+    const res=await fetch(`${BASE}/users/me`,{
       method:'PUT',
       headers:authHeaders(),
       body:JSON.stringify(u)
@@ -1581,7 +1620,7 @@ function App(){
   };
 
   const createTrip=async(t)=>{
-    const res=await fetch('https://my-travel-buddy-kn22.onrender.com/api/trips/',{
+    const res=await fetch(`${BASE}/trips/`,{
       method:'POST',
       headers:authHeaders(),
       body:JSON.stringify(t)
