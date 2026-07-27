@@ -134,19 +134,19 @@ def send_reset_email(to_email, reset_token):
 
     # Fallback attempt 1: SSL (port 465)
     try:
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=20)
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=3)
         server.login(GMAIL, GMAIL_PASS)
         server.sendmail(GMAIL, to_email, msg.as_string())
         server.quit()
-        print(f"Email sent via Gmail SSL to {to_email}")
+        print(f"Email sent via Gmail SSL to {to_email}", flush=True)
         return True, "Email sent via Gmail SSL"
     except Exception as e:
-        print(f"Gmail SSL error: {str(e)}")
+        print(f"Gmail SSL error: {str(e)}", flush=True)
         gmail_ssl_error = str(e)
 
     # Fallback attempt 2: STARTTLS (port 587)
     try:
-        server = smtplib.SMTP('smtp.gmail.com', 587, timeout=20)
+        server = smtplib.SMTP('smtp.gmail.com', 587, timeout=3)
         server.ehlo()
         server.starttls()
         server.ehlo()
@@ -213,7 +213,7 @@ def send_join_request_email(host_email, host_name, trip_title, requester_name, r
     msg.attach(MIMEText(html, 'html'))
 
     try:
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=20)
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=3)
         server.login(gmail_user, gmail_pass)
         server.sendmail(gmail_user, host_email, msg.as_string())
         server.quit()
@@ -265,7 +265,7 @@ def send_registration_otp_email(to_email, otp_code):
     msg.attach(MIMEText(html, 'html'))
 
     try:
-        server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=20)
+        server = smtplib.SMTP_SSL('smtp.gmail.com', 465, timeout=3)
         server.login(gmail_user, gmail_pass)
         server.sendmail(gmail_user, to_email, msg.as_string())
         server.quit()
