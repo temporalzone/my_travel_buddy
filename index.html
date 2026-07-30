@@ -1485,15 +1485,28 @@ function ProfilePage({user,onUpdate,onLogout,onDeleteAccount,showToast}){
     showToast('✅ Profile updated!');
   };
 
-  const changePw=()=>{
+  const changePw=async()=>{
     setPwErr('');setPwOk('');
     if(!pw.old||!pw.n1||!pw.n2){setPwErr('Fill all password fields.');return;}
-    if(pw.old!==user.password){setPwErr('Current password is incorrect.');return;}
     if(pw.n1.length<6){setPwErr('New password must be at least 6 characters.');return;}
     if(pw.n1!==pw.n2){setPwErr('New passwords do not match.');return;}
-    onUpdate({...user,password:pw.n1});
-    setPwOk('Password changed successfully!');
-    setPw({old:'',n1:'',n2:''});
+    try {
+      const res=await fetch(`${BASE}/users/me/password`,{
+        method:'PUT',
+        headers:authHeaders(),
+        body:JSON.stringify({old_password:pw.old,new_password:pw.n1})
+      });
+      const data=await res.json();
+      if(!res.ok || data.error){
+        setPwErr(data.error||'Failed to update password.');
+        return;
+      }
+      setPwOk('Password changed successfully!');
+      setPw({old:'',n1:'',n2:''});
+    } catch(e) {
+      console.error(e);
+      setPwErr('Connection failed. Please try again.');
+    }
   };
 
   const joined=new Date(user.joinedAt||Date.now()).toLocaleDateString('en-IN',{year:'numeric',month:'short',day:'numeric'});
