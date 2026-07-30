@@ -249,6 +249,164 @@ html,body{height:100%;font-family:'Nunito',sans-serif;background:var(--surface);
   .chat-layout{grid-template-columns:1fr;height:auto;}
   .field-row{grid-template-columns:1fr;}
 }
+
+/* Splash Screen Styles */
+.splash-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: #0f172a;
+  background: radial-gradient(circle at center, #1e1b4b 0%, #0f172a 100%);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  transition: opacity 0.8s cubic-bezier(0.4, 0, 0.2, 1), visibility 0.8s;
+  opacity: 1;
+  visibility: visible;
+}
+.splash-screen.fade-out {
+  opacity: 0;
+  visibility: hidden;
+}
+.splash-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+.splash-logo-container {
+  position: relative;
+  width: 150px;
+  height: 150px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+.splash-globe {
+  filter: drop-shadow(0 0 25px rgba(14, 165, 233, 0.45));
+  animation: float 4s ease-in-out infinite;
+}
+.rotating-orbit {
+  animation: rotate-orbit 12s linear infinite;
+  transform-origin: center;
+}
+.pulsing-ellipse {
+  animation: pulse-ellipse 3s ease-in-out infinite alternate;
+  transform-origin: center;
+}
+.glowing-dot {
+  animation: glow-dot 1.5s ease-in-out infinite alternate;
+}
+.splash-plane-path {
+  position: absolute;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  animation: flight-orbit 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+  transform-origin: center;
+}
+.splash-plane {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%) rotate(90deg);
+  font-size: 1.4rem;
+  filter: drop-shadow(0 0 5px rgba(255, 255, 255, 0.8));
+}
+.splash-title {
+  font-family: 'Syne', sans-serif;
+  font-weight: 800;
+  font-size: 2.75rem;
+  letter-spacing: -0.05em;
+  color: white;
+  margin-bottom: 1rem;
+  display: flex;
+  gap: 0.15rem;
+}
+.splash-title span {
+  opacity: 0;
+  transform: translateY(20px);
+  animation: reveal-letter 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+.splash-title span:nth-child(1) { animation-delay: 0.1s; }
+.splash-title span:nth-child(2) { animation-delay: 0.18s; }
+.splash-title span:nth-child(3) { animation-delay: 0.26s; }
+.splash-title span:nth-child(4) { animation-delay: 0.34s; }
+.splash-title span:nth-child(5) { animation-delay: 0.42s; }
+.splash-title span:nth-child(6) { animation-delay: 0.5s; }
+.splash-title span:nth-child(7) { animation-delay: 0.58s; }
+.splash-title span:nth-child(8) { animation-delay: 0.66s; }
+.splash-title span:nth-child(9) { animation-delay: 0.74s; }
+.splash-title span:nth-child(10) { animation-delay: 0.82s; }
+.splash-title-em {
+  color: #0EA5E9;
+  text-shadow: 0 0 15px rgba(14, 165, 233, 0.3);
+}
+.splash-loader-bar {
+  width: 180px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  overflow: hidden;
+  margin-bottom: 1.25rem;
+  position: relative;
+}
+.splash-loader-progress {
+  width: 0%;
+  height: 100%;
+  background: linear-gradient(90deg, #0EA5E9, #8B5CF6);
+  border-radius: 10px;
+  animation: fill-loader 2s cubic-bezier(0.1, 0.8, 0.1, 1) forwards;
+}
+.splash-subtitle {
+  color: #94a3b8;
+  font-size: 0.9rem;
+  font-weight: 500;
+  letter-spacing: 0.05em;
+  opacity: 0;
+  animation: fade-in-up 0.8s ease forwards;
+  animation-delay: 1.2s;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes rotate-orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes pulse-ellipse {
+  0% { transform: scale(0.95); opacity: 0.7; }
+  100% { transform: scale(1.05); opacity: 1; }
+}
+@keyframes glow-dot {
+  0% { filter: drop-shadow(0 0 2px #F59E0B); }
+  100% { filter: drop-shadow(0 0 8px #F59E0B); }
+}
+@keyframes flight-orbit {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes reveal-letter {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes fill-loader {
+  to { width: 100%; }
+}
+@keyframes fade-in-up {
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
 </style>
 </head>
 <body>
@@ -310,6 +468,42 @@ function Av({name,size='md',onClick,imageUrl}){
 function Toast({msg,onDone}){
   useEffect(()=>{const t=setTimeout(onDone,3200);return()=>clearTimeout(t);},[]);
   return <div className="toast">{msg}</div>;
+}
+
+/* ── SPLASH SCREEN ── */
+function SplashScreen({ fadeOut }) {
+  return (
+    <div className={`splash-screen ${fadeOut ? 'fade-out' : ''}`}>
+      <div className="splash-content">
+        <div className="splash-logo-container">
+          <svg className="splash-globe" width="100" height="100" viewBox="0 0 30 30" fill="none">
+            <circle cx="15" cy="15" r="15" fill="url(#splash-grad)" />
+            <circle cx="15" cy="15" r="9" fill="none" stroke="white" strokeWidth="1" strokeDasharray="3, 2" className="rotating-orbit" />
+            <ellipse cx="15" cy="15" rx="4.2" ry="9" fill="none" stroke="white" strokeWidth="1" className="pulsing-ellipse" />
+            <line x1="6" y1="15" x2="24" y2="15" stroke="white" strokeWidth="0.8" opacity="0.7" />
+            <circle cx="21" cy="8.5" r="1.8" fill="#F59E0B" className="glowing-dot" />
+            <defs>
+              <linearGradient id="splash-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#0EA5E9" />
+                <stop offset="100%" stopColor="#8B5CF6" />
+              </linearGradient>
+            </defs>
+          </svg>
+          <div className="splash-plane-path">
+            <span className="splash-plane">✈️</span>
+          </div>
+        </div>
+        <h1 className="splash-title">
+          <span>T</span><span>r</span><span>a</span><span>v</span><span>e</span><span>l</span>
+          <span className="splash-title-em">B</span><span className="splash-title-em">u</span><span className="splash-title-em">d</span><span className="splash-title-em">d</span><span className="splash-title-em">y</span>
+        </h1>
+        <div className="splash-loader-bar">
+          <div className="splash-loader-progress"></div>
+        </div>
+        <p className="splash-subtitle">Chasing horizons, together...</p>
+      </div>
+    </div>
+  );
 }
 
 function optimizeAvatarFile(file,maxDim=512,quality=0.82){
@@ -1565,6 +1759,8 @@ function App(){
   const [pendingRequests,setPendingRequests]=useState([]);
   const [me,setMe]=useState(null);
   const [loading,setLoading]=useState(true);
+  const [showSplash, setShowSplash] = useState(true);
+  const [fadeSplash, setFadeSplash] = useState(false);
   const getToken=()=>localStorage.getItem('tb_token');
   const authHeaders=()=>({'Content-Type':'application/json','Authorization':'Bearer '+getToken()});
 
@@ -1581,6 +1777,17 @@ function App(){
         setLoading(false);
       }).catch(()=>setLoading(false));
   },[]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setFadeSplash(true);
+      const unmountTimer = setTimeout(() => {
+        setShowSplash(false);
+      }, 800);
+      return () => clearTimeout(unmountTimer);
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const loadTrips=async()=>{
     const res=await fetch(BASE+'/trips/',{headers:authHeaders()});
@@ -1670,35 +1877,47 @@ function App(){
     return data;
   };
 
-  if(!me) return <AuthScreen onLogin={login} users={users} setUsers={setUsers}/>;
+  const renderContent = () => {
+    if (loading) {
+      return <div style={{ background: '#0f172a', width: '100vw', height: '100vh' }} />;
+    }
+    if (!me) {
+      return <AuthScreen onLogin={login} users={users} setUsers={setUsers}/>;
+    }
+    const freshMe=users.find(u=>u.id===me.id)||me;
+    return (
+      <AppShell
+        user={freshMe}
+        trips={trips}
+        users={users}
+        onLogout={logout}
+        onUpdate={updateUser}
+        onDeleteAccount={deleteAccount}
+        onJoin={joinTrip}
+        onCreateTrip={createTrip}
+        onUpdateTrip={updateTrip}
+        pendingRequests={pendingRequests}
+        onApproveRequest={async (rid)=>{
+          const out=await approveRequest(rid);
+          if(out&&out.error){
+            alert(out.error);
+          }
+        }}
+        onRejectRequest={async (rid)=>{
+          const out=await rejectRequest(rid);
+          if(out&&out.error){
+            alert(out.error);
+          }
+        }}
+      />
+    );
+  };
 
-  const freshMe=users.find(u=>u.id===me.id)||me;
-
-  return(
-    <AppShell
-      user={freshMe}
-      trips={trips}
-      users={users}
-      onLogout={logout}
-      onUpdate={updateUser}
-      onDeleteAccount={deleteAccount}
-      onJoin={joinTrip}
-      onCreateTrip={createTrip}
-      onUpdateTrip={updateTrip}
-      pendingRequests={pendingRequests}
-      onApproveRequest={async (rid)=>{
-        const out=await approveRequest(rid);
-        if(out&&out.error){
-          alert(out.error);
-        }
-      }}
-      onRejectRequest={async (rid)=>{
-        const out=await rejectRequest(rid);
-        if(out&&out.error){
-          alert(out.error);
-        }
-      }}
-    />
+  return (
+    <React.Fragment>
+      {renderContent()}
+      {showSplash && <SplashScreen fadeOut={fadeSplash} />}
+    </React.Fragment>
   );
 }
 
